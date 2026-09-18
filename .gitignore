@@ -1,0 +1,32 @@
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+.env
+.env.local
+.vercel
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Assets fuente sin procesar — las versiones optimizadas que realmente usa la app
+# viven en src/assets/brand/ y public/favicon.png.
+/logo jugoso.png
+/logojugoso sin fondo.png
+/codigo qr de pago.jpg
+.claude/
+
+.vercel
+.env*
