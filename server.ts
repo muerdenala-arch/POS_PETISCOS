@@ -21,14 +21,14 @@ import qrCodesHandler from './api/qr-codes.js';
 import registerSessionsHandler from './api/register-sessions.js';
 import salesHandler from './api/sales.js';
 import uploadHandler from './api/upload.js';
-import adminReportsHandler from './api/admin/reports.js';
+import expensesHandler from './api/expenses.js';
 import promotionsHandler from './api/promotions.js';
 import couponsHandler from './api/coupons.js';
 
 import type { Request, Response } from 'express';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-const PORT = 3333;
+const PORT = 3334;
 
 // Express req/res son compatibles con Vercel req/res para nuestros handlers
 function adapt(handler: (req: VercelRequest, res: VercelResponse) => unknown) {
@@ -40,8 +40,8 @@ async function main() {
   const app = express();
 
   // ── Body parsers ─────────────────────────────────────────────────────────────
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // ── Rutas de la API ──────────────────────────────────────────────────────────
   app.all('/api/branches', adapt(branchesHandler));
@@ -61,8 +61,8 @@ async function main() {
   app.all('/api/sales', adapt(salesHandler));
   app.all('/api/sales/*', adapt(salesHandler));
   app.all('/api/upload', adapt(uploadHandler));
-  app.all('/api/admin/reports', adapt(adminReportsHandler));
-  app.all('/api/admin/reports/*', adapt(adminReportsHandler));
+  app.all('/api/expenses', adapt(expensesHandler));
+  app.all('/api/expenses/*', adapt(expensesHandler));
   app.all('/api/promotions', adapt(promotionsHandler));
   app.all('/api/promotions/*', adapt(promotionsHandler));
   app.all('/api/coupons', adapt(couponsHandler));
@@ -78,9 +78,10 @@ async function main() {
   app.use(vite.middlewares);
 
   // ── Lanzar servidor ──────────────────────────────────────────────────────────
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`\n  ✅ Plantilla POS — Servidor local listo`);
-    console.log(`  ➜  http://localhost:${PORT}/\n`);
+    console.log(`  ➜  http://localhost:${PORT}/`);
+    console.log(`  ➜  Red: http://0.0.0.0:${PORT}/\n`);
   });
 }
 

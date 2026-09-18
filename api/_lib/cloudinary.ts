@@ -2,11 +2,11 @@ import { v2 as cloudinary } from 'cloudinary';
 
 let configured = false;
 
-function ensureConfigured() {
-  if (configured) return;
+function isConfigured(): boolean {
+  if (configured) return true;
   const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) {
-    throw new Error('Faltan las variables de entorno de Cloudinary (CLOUDINARY_*)');
+    return false;
   }
   cloudinary.config({
     cloud_name: CLOUDINARY_CLOUD_NAME,
@@ -14,14 +14,18 @@ function ensureConfigured() {
     api_secret: CLOUDINARY_API_SECRET,
   });
   configured = true;
+  return true;
 }
 
-export type ImageFolder = 'receipts' | 'qr-codes';
+export type ImageFolder = 'receipts' | 'qr-codes' | 'products';
 
 /** Sube una imagen (data URL base64, ya comprimida en el navegador) a Cloudinary y
  *  devuelve su URL pública HTTPS permanente. */
 export async function uploadImage(dataUrl: string, folder: ImageFolder): Promise<string> {
-  ensureConfigured();
+  if (!isConfigured()) {
+    console.warn('Cloudinary no configurado. Se usará la imagen en base64 localmente.');
+    return dataUrl;
+  }
   const result = await cloudinary.uploader.upload(dataUrl, {
     folder: `pos-template/${folder}`,
     resource_type: 'image',

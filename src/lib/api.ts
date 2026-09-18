@@ -122,7 +122,7 @@ export const api = {
   },
   upload: {
     /** Sube una imagen (data URL comprimido en el navegador) a Cloudinary y devuelve su URL pública. */
-    image: (dataUrl: string, folder: 'receipts' | 'qr-codes') =>
+    image: (dataUrl: string, folder: 'receipts' | 'qr-codes' | 'products') =>
       post<{ url: string }>('/upload', { image: dataUrl, folder }),
   },
   promotions: {

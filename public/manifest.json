@@ -1,38 +1,32 @@
 {
-  "name": "POS Template",
-  "short_name": "POS",
-  "description": "Sistema POS táctil — plantilla.",
+  "name": "Petiscos POS",
+  "short_name": "Petiscos",
+  "description": "Sistema POS de Petiscos",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
-  "background_color": "#E91E8C",
-  "theme_color": "#E91E8C",
+  "background_color": "#137F48",
+  "theme_color": "#137F48",
   "orientation": "portrait-primary",
   "lang": "es-BO",
   "categories": ["food", "business", "productivity"],
   "icons": [
     {
-      "src": "/favicon.png",
+      "src": "/favicon-petiscos.jpeg",
       "sizes": "48x48",
-      "type": "image/png"
+      "type": "image/jpeg"
     },
     {
-      "src": "/icon.png",
+      "src": "/logo-petiscos.jpeg",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/jpeg",
       "purpose": "any"
     },
     {
-      "src": "/icon.png",
+      "src": "/logo-petiscos.jpeg",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/icon-maskable.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "type": "image/jpeg",
+      "purpose": "any maskable"
     }
   ]
 }

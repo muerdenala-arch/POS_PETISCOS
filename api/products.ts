@@ -4,7 +4,7 @@ import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js
 import type { Product } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
-  id, name, category, description, base_price as "basePrice", gradient, emoji, sizes,
+  id, name, category, description, base_price as "basePrice", gradient, emoji, image_url as "imageUrl", sizes,
   topping_ids as "toppingIds", branch_ids as "branchIds", active, stock_by_branch as "stockByBranch",
   low_stock_threshold as "lowStockThreshold", unit
 `;
@@ -22,14 +22,14 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     const body = requireBody<Product>(req);
     const rows = await query<Product>(
       `insert into products (
-         id, name, category, description, base_price, gradient, emoji, sizes,
+         id, name, category, description, base_price, gradient, emoji, image_url, sizes,
          topping_ids, branch_ids, active, stock_by_branch,
          low_stock_threshold, unit
        )
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        on conflict (id) do update set
          name = excluded.name, category = excluded.category, description = excluded.description,
-         base_price = excluded.base_price, gradient = excluded.gradient, emoji = excluded.emoji,
+         base_price = excluded.base_price, gradient = excluded.gradient, emoji = excluded.emoji, image_url = excluded.image_url,
          sizes = excluded.sizes, topping_ids = excluded.topping_ids, branch_ids = excluded.branch_ids,
          active = excluded.active, stock_by_branch = excluded.stock_by_branch,
          low_stock_threshold = excluded.low_stock_threshold, unit = excluded.unit, updated_at = now()
@@ -42,6 +42,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         body.basePrice ?? 0,
         body.gradient ?? '',
         body.emoji ?? '',
+        body.imageUrl ?? '',
         JSON.stringify(body.sizes ?? []),
         JSON.stringify(body.toppingIds ?? []),
         JSON.stringify(body.branchIds ?? []),
@@ -65,13 +66,14 @@ async function handler(req: VercelRequest, res: VercelResponse) {
          base_price = coalesce($5, base_price),
          gradient = coalesce($6, gradient),
          emoji = coalesce($7, emoji),
-         sizes = coalesce($8, sizes),
-         topping_ids = coalesce($9, topping_ids),
-         branch_ids = coalesce($10, branch_ids),
-         active = coalesce($11, active),
-         stock_by_branch = coalesce($12, stock_by_branch),
-         low_stock_threshold = coalesce($13, low_stock_threshold),
-         unit = coalesce($14, unit),
+         image_url = coalesce($8, image_url),
+         sizes = coalesce($9, sizes),
+         topping_ids = coalesce($10, topping_ids),
+         branch_ids = coalesce($11, branch_ids),
+         active = coalesce($12, active),
+         stock_by_branch = coalesce($13, stock_by_branch),
+         low_stock_threshold = coalesce($14, low_stock_threshold),
+         unit = coalesce($15, unit),
          updated_at = now()
        where id = $1
        returning ${SELECT_COLUMNS}`,
@@ -83,6 +85,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
         body.basePrice ?? null,
         body.gradient ?? null,
         body.emoji ?? null,
+        body.imageUrl ?? null,
         body.sizes ? JSON.stringify(body.sizes) : null,
         body.toppingIds ? JSON.stringify(body.toppingIds) : null,
         body.branchIds ? JSON.stringify(body.branchIds) : null,

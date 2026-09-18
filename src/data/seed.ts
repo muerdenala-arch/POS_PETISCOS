@@ -21,5 +21,5 @@ export const AVATAR_COLORS = [
 
 export const PRODUCTS: Product[] = [];
 
-export const CATEGORIES = [];
+export const CATEGORIES: string[] = [];
 

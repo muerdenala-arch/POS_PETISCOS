@@ -9,7 +9,7 @@ import { useCartStore } from '@/store/cartStore';
 import { useCouponStore } from '@/store/couponStore';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { APP_CONFIG } from '@/config/app';
-import logoMark from '@/assets/brand/logo-mark.png';
+import logoMark from '@/assets/brand/logo.jpeg';
 import { logoGlowClasses } from '@/lib/brand';
 import { cn } from '@/lib/utils';
 import { onSyncStateChange } from '@/lib/syncManager';

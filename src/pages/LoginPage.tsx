@@ -91,7 +91,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="mb-6 flex flex-col items-center text-center">
           <LoginLogo />
-          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink">EL MERENGÓN</h1>
+          <h1 className="mt-1 font-display text-2xl font-bold tracking-tight text-ink">PETISCOS</h1>
           <p className="mt-1 text-[10px] font-bold uppercase tracking-widest text-ink-muted">Sistema POS & Gestión</p>
         </div>
 

@@ -58,6 +58,7 @@ CREATE TABLE IF NOT EXISTS products (
   base_price           numeric(10, 2) NOT NULL DEFAULT 0,
   gradient             text NOT NULL DEFAULT '',
   emoji                text NOT NULL DEFAULT '',
+  image_url            text NOT NULL DEFAULT '',
   sizes                jsonb NOT NULL DEFAULT '[]',
 
   topping_ids          jsonb NOT NULL DEFAULT '[]',
@@ -65,7 +66,7 @@ CREATE TABLE IF NOT EXISTS products (
   active               boolean NOT NULL DEFAULT true,
   stock_by_branch      jsonb NOT NULL DEFAULT '{}',
   low_stock_threshold  integer NOT NULL DEFAULT 0,
-  unit                 text NOT NULL DEFAULT 'vasos',
+  unit                 text NOT NULL DEFAULT 'unidades',
   updated_at           timestamptz NOT NULL DEFAULT now()
 );
 
@@ -145,3 +146,31 @@ CREATE INDEX IF NOT EXISTS idx_register_sessions_status ON register_sessions (st
 CREATE INDEX IF NOT EXISTS idx_register_sessions_opened_at ON register_sessions (opened_at DESC);
 CREATE INDEX IF NOT EXISTS idx_qr_codes_branch ON qr_codes (branch_id);
 
+-- ── Promociones ──────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS promotions (
+  id             text PRIMARY KEY,
+  name           text NOT NULL,
+  discount_type  text NOT NULL,
+  discount_value numeric(10, 2) NOT NULL,
+  applies_to     text NOT NULL DEFAULT 'ALL',
+  branch_ids     jsonb NOT NULL DEFAULT '[]',
+  is_active      boolean NOT NULL DEFAULT true,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now()
+);
+
+-- ── Cupones ──────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS coupons (
+  id             text PRIMARY KEY,
+  code           text NOT NULL UNIQUE,
+  discount_type  text NOT NULL,
+  discount_value numeric(10, 2) NOT NULL,
+  max_uses       integer NOT NULL DEFAULT 1,
+  used_count     integer NOT NULL DEFAULT 0,
+  expires_at     timestamptz,
+  is_active      boolean NOT NULL DEFAULT true,
+  applies_to     text NOT NULL DEFAULT 'ALL',
+  branch_id      text,
+  created_at     timestamptz NOT NULL DEFAULT now(),
+  updated_at     timestamptz NOT NULL DEFAULT now()
+);

@@ -7,20 +7,37 @@ import { useRegisterStore } from '@/store/registerStore';
 import { useSalesStore } from '@/store/salesStore';
 import { usePromotionStore } from '@/store/promotionStore';
 import { useExpenseStore } from '@/store/expenseStore';
+import { useCouponStore } from '@/store/couponStore';
 
 const POLL_INTERVAL_MS = 60000;
 
 export function useDataSync() {
   useEffect(() => {
+    let isInitial = true;
     const fetchAll = () => {
-      useBranchStore.getState().fetchAll();
-      useStaffStore.getState().fetchAll();
-      useCatalogStore.getState().fetchAll();
-      useQrCodeStore.getState().fetchAll();
-      useRegisterStore.getState().fetchAll();
-      useSalesStore.getState().fetchAll();
-      usePromotionStore.getState().fetchAll();
-      useExpenseStore.getState().fetchAll();
+      if (isInitial) {
+        useBranchStore.getState().fetchAll();
+        useStaffStore.getState().fetchAll();
+        useCatalogStore.getState().fetchAll();
+        useQrCodeStore.getState().fetchAll();
+        useRegisterStore.getState().fetchAll();
+        useSalesStore.getState().fetchAll();
+        usePromotionStore.getState().fetchAll();
+        useExpenseStore.getState().fetchAll();
+        useCouponStore.getState().fetchAll();
+        isInitial = false;
+      } else {
+        // Desfasar peticiones en background para evitar bloquear el hilo principal (tironazo en la UI)
+        setTimeout(() => useBranchStore.getState().fetchAll(), 0);
+        setTimeout(() => useStaffStore.getState().fetchAll(), 500);
+        setTimeout(() => useCatalogStore.getState().fetchAll(), 1000);
+        setTimeout(() => useQrCodeStore.getState().fetchAll(), 1500);
+        setTimeout(() => useRegisterStore.getState().fetchAll(), 2000);
+        setTimeout(() => useSalesStore.getState().fetchAll(), 2500);
+        setTimeout(() => usePromotionStore.getState().fetchAll(), 3000);
+        setTimeout(() => useExpenseStore.getState().fetchAll(), 3500);
+        setTimeout(() => useCouponStore.getState().fetchAll(), 4000);
+      }
     };
 
     let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -58,5 +75,7 @@ export function useIsDataHydrated(): boolean {
   const registerSessions = useRegisterStore((s) => s.hydrated);
   const sales = useSalesStore((s) => s.hydrated);
   const expenses = useExpenseStore((s) => s.hydrated);
-  return branches && staff && catalog && qrCodes && registerSessions && sales && expenses;
+  const promotions = usePromotionStore((s) => s.hydrated);
+  const coupons = useCouponStore((s) => s.hydrated);
+  return branches && staff && catalog && qrCodes && registerSessions && sales && expenses && promotions && coupons;
 }

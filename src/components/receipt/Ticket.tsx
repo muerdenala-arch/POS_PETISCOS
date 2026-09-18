@@ -7,7 +7,7 @@ import type { Sale } from '@/types';
 import { cn, formatCurrency, formatDateTime } from '@/lib/utils';
 import { APP_CONFIG } from '@/config/app';
 import { useBranchStore } from '@/store/branchStore';
-import logoMark from '@/assets/brand/logo-mark.png';
+import logoMark from '@/assets/brand/logo.jpeg';
 import { logoGlowClasses } from '@/lib/brand';
 
 interface TicketProps {

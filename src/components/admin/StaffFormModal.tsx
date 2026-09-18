@@ -71,8 +71,8 @@ export function StaffFormModal({ user, open, onClose }: StaffFormModalProps) {
       setPinError('Ese PIN ya está en uso por otro miembro del personal.');
       return;
     }
-    if (form.branchIds.length === 0) {
-      setBranchError('Asigna al menos una sucursal.');
+    if (form.role === 'cajero' && form.branchIds.length === 0) {
+      setBranchError('Un cajero necesita al menos una sucursal.');
       return;
     }
 
@@ -167,19 +167,25 @@ export function StaffFormModal({ user, open, onClose }: StaffFormModalProps) {
             Con una sola sucursal entra directo; con varias, elige al iniciar turno.
           </p>
           <div className="flex flex-wrap gap-2">
-            {branches.map((b) => (
-              <button
-                key={b.id}
-                type="button"
-                onClick={() => toggleBranch(b.id)}
-                className={cn(
-                  'rounded-full border px-3.5 py-2 text-sm transition-colors cursor-pointer',
-                  form.branchIds.includes(b.id) ? optionActiveClasses : optionInactiveClasses,
-                )}
-              >
-                {b.name}
-              </button>
-            ))}
+            {branches.length === 0 ? (
+              <p className="text-sm italic text-amber-600">
+                ⚠️ No hay sucursales creadas. Ve a "Sucursales" y crea una primero.
+              </p>
+            ) : (
+              branches.map((b) => (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => toggleBranch(b.id)}
+                  className={cn(
+                    'rounded-full border px-3.5 py-2 text-sm transition-colors cursor-pointer',
+                    form.branchIds.includes(b.id) ? optionActiveClasses : optionInactiveClasses,
+                  )}
+                >
+                  {b.name}
+                </button>
+              ))
+            )}
           </div>
           {branchError && <p className="mt-1.5 text-xs font-semibold text-red-600">{branchError}</p>}
         </div>

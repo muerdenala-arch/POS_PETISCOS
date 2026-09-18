@@ -1,8 +1,8 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { resolveTheme, useThemeStore } from '@/store/themeStore';
 import { APP_CONFIG } from '@/config/app';
-import logoFull from '@/assets/brand/logo-full.png';
-import logoFullDark from '@/assets/brand/logo-full-dark.png';
+import logoFull from '@/assets/brand/logo.jpeg';
+import logoFullDark from '@/assets/brand/logo.jpeg';
 
 /**
  * Logo del login: imagen recortada en círculo elegante con borde sutil,

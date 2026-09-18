@@ -17,14 +17,20 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatDateTime(iso: string): string {
+  if (!iso) return '—';
+  const dt = new Date(iso);
+  if (isNaN(dt.getTime())) return 'Fecha inválida';
   return new Intl.DateTimeFormat(APP_CONFIG.locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
-  }).format(new Date(iso));
+  }).format(dt);
 }
 
 export function formatTime(iso: string): string {
-  return new Intl.DateTimeFormat(APP_CONFIG.locale, { timeStyle: 'short' }).format(new Date(iso));
+  if (!iso) return '—';
+  const dt = new Date(iso);
+  if (isNaN(dt.getTime())) return '--:--';
+  return new Intl.DateTimeFormat(APP_CONFIG.locale, { timeStyle: 'short' }).format(dt);
 }
 
 export function uid(prefix = 'id'): string {

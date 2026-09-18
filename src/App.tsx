@@ -4,6 +4,7 @@ import { RequireAuth } from '@/router/RequireAuth';
 import { useAuthStore } from '@/store/authStore';
 import { useThemeEffect } from '@/hooks/useThemeEffect';
 import { useDataSync, useIsDataHydrated } from '@/hooks/useDataSync';
+import { useAutoLogout } from '@/hooks/useAutoLogout';
 import { LoadingScreen } from '@/components/layout/LoadingScreen';
 import LoginPage from '@/pages/LoginPage';
 import POSPage from '@/pages/POSPage';
@@ -30,6 +31,7 @@ export default function App() {
   const currentUser = useAuthStore((s) => s.currentUser);
   useThemeEffect();
   useDataSync();
+  useAutoLogout();
   const dataReady = useIsDataHydrated();
   const [syncTimedOut, setSyncTimedOut] = useState(false);
 

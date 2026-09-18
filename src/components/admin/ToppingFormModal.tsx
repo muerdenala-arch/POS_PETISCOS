@@ -82,12 +82,12 @@ export function ToppingFormModal({ topping, open, onClose }: ToppingFormModalPro
     <Modal
       open={open}
       onClose={onClose}
-      title={topping ? 'Editar topping' : 'Nuevo topping / agregado'}
+      title={topping ? 'Editar agregado' : 'Nuevo agregado'!}
       size="sm"
     >
       <div className="flex flex-col gap-4 px-6 pb-6 pt-2">
         <Input
-          label="Nombre del topping"
+          label="Nombre del agregado"
           placeholder="Ej. Nutella, Oreo triturada, Chantilly..."
           value={form.name}
           onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
@@ -157,7 +157,7 @@ export function ToppingFormModal({ topping, open, onClose }: ToppingFormModalPro
           size="lg"
           disabled={!form.name.trim()}
         >
-          {topping ? 'Guardar cambios' : 'Crear topping'}
+          {topping ? 'Guardar cambios' : 'Crear agregado'}
         </Button>
       </div>
     </Modal>

@@ -45,7 +45,7 @@ export default function CatalogPage() {
               onClick={() => setEditingTopping('new')}
               className="!bg-secondary-500 hover:!bg-secondary-600"
             >
-              <Plus size={18} /> Nuevo topping
+              <Plus size={18} /> Nuevo agregado
             </Button>
           )}
         </div>
@@ -54,7 +54,7 @@ export default function CatalogPage() {
         <div className="mb-6 flex gap-1 rounded-xl bg-zinc-100 p-1 dark:bg-zinc-800">
           {([
             { key: 'productos', label: 'Productos', Icon: Package },
-            { key: 'toppings', label: 'Toppings / Agregados', Icon: Sparkles },
+            { key: 'toppings', label: 'Agregados', Icon: Sparkles },
           ] as { key: Tab; label: string; Icon: typeof Package }[]).map(({ key, label, Icon }) => (
             <button
               key={key}
@@ -114,14 +114,14 @@ export default function CatalogPage() {
                   <button
                     onClick={() => setEditingTopping(t)}
                     className="flex h-9 w-9 items-center justify-center rounded-lg text-ink-muted hover:bg-zinc-100 hover:text-ink transition-colors cursor-pointer dark:hover:bg-zinc-700"
-                    title="Editar topping"
+                    title="Editar agregado"
                   >
                     <Pencil size={15} />
                   </button>
                   <button
                     onClick={() => deleteTopping(t.id)}
                     className="flex h-9 w-9 items-center justify-center rounded-lg text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer dark:hover:bg-red-900/20"
-                    title="Eliminar topping"
+                    title="Eliminar agregado"
                   >
                     <Trash2 size={15} />
                   </button>
@@ -131,7 +131,7 @@ export default function CatalogPage() {
 
             {toppings.length === 0 && (
               <p className="col-span-full py-12 text-center text-sm text-ink-muted">
-                No hay toppings. Usa "Nuevo topping" para agregar.
+                No hay agregados. Usa "Nuevo agregado" para agregar.
               </p>
             )}
           </motion.div>

@@ -135,7 +135,7 @@ export function AdminExpenseModal({ onClose }: AdminExpenseModalProps) {
                 required
                 value={concept}
                 onChange={(e) => setConcept(e.target.value)}
-                placeholder="Ej. Compra de 3 cajas de frutillas"
+                placeholder="Ej. Compra de insumos"
                 className={fieldClasses}
               />
             </div>

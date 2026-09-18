@@ -15,6 +15,16 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   const id = typeof req.query.id === 'string' ? req.query.id : undefined;
 
   if (req.method === 'GET' && !id) {
+    // Auto-cierre de cajas abiertas en días anteriores (hora de La Paz)
+    await query(`
+      UPDATE register_sessions
+      SET status = 'cerrada',
+          closed_at = now(),
+          notes = trim(coalesce(notes, '') || ' (Cierre automático por cambio de día)')
+      WHERE status = 'abierta'
+        AND (opened_at AT TIME ZONE 'America/La_Paz')::date < (now() AT TIME ZONE 'America/La_Paz')::date
+    `);
+
     // Mismo recorte que /api/sales: sin esto la tabla crece sin límite (una fila por cada
     // apertura/cierre de caja, para siempre) y el poll de 6s la baja entera cada vez —
     // cuantas más sesiones se acumulen, más lento el JSON.stringify de sameData() en cada

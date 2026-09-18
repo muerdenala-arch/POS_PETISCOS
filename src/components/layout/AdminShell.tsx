@@ -8,7 +8,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { fieldClasses } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 import { APP_CONFIG } from '@/config/app';
-import logoMark from '@/assets/brand/logo-mark.png';
+import logoMark from '@/assets/brand/logo.jpeg';
 import { logoGlowClasses } from '@/lib/brand';
 
 const NAV_ITEMS = [
@@ -103,7 +103,7 @@ function AdminSidebarContent({
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate font-display text-sm font-bold leading-tight text-ink">
-            MERENGÓN
+            PETISCOS
           </p>
           <p className="truncate text-[10px] font-bold uppercase tracking-widest text-accent-600">
             Panel Admin

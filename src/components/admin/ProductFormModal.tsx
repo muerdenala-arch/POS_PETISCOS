@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
+import { useEffect, useState, useRef } from 'react';
+import { Plus, Trash2, Camera, Upload, Image as ImageIcon } from 'lucide-react';
 import { Modal } from '@/components/ui/Modal';
 import { Input, fieldClasses, fieldLabelClasses } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +9,8 @@ import { useBranchStore } from '@/store/branchStore';
 import { SIZES, CATEGORIES } from '@/data/seed';
 import type { Product, SizeOption } from '@/types';
 import { cn, uid } from '@/lib/utils';
+import { fileToCompressedDataUrl } from '@/lib/image';
+import { api } from '@/lib/api';
 
 interface ProductFormModalProps {
   product: Product | null;
@@ -40,14 +42,15 @@ const emptyForm = {
   stock: '30',
   lowStockThreshold: '8',
   emoji: EMOJI_OPTIONS[0],
+  imageUrl: '',
   gradient: GRADIENT_OPTIONS[0],
   toppingIds: [] as string[],
   branchIds: [] as string[],
-  unit: 'vasos',
+  unit: 'unidades',
   sizes: SIZES.map((s) => ({ ...s })) as SizeOption[],
 };
 
-const UNITS = ['vasos', 'unidades', 'botellas', 'latas', 'porciones', 'cajas'];
+const UNITS = ['unidades', 'porciones', 'botellas', 'latas', 'cajas'];
 
 export function ProductFormModal({ product, open, onClose }: ProductFormModalProps) {
   const toppings = useCatalogStore((s) => s.toppings);
@@ -61,6 +64,10 @@ export function ProductFormModal({ product, open, onClose }: ProductFormModalPro
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
   
+  const [uploading, setUploading] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
+
   const [useCalculator, setUseCalculator] = useState(false);
   const [boxes, setBoxes] = useState('');
   const [unitsPerBox, setUnitsPerBox] = useState('');
@@ -75,10 +82,11 @@ export function ProductFormModal({ product, open, onClose }: ProductFormModalPro
         stock: '0',
         lowStockThreshold: String(product.lowStockThreshold),
         emoji: product.emoji,
+        imageUrl: product.imageUrl || '',
         gradient: product.gradient,
         toppingIds: product.toppingIds,
         branchIds: product.branchIds || [],
-        unit: product.unit || 'vasos',
+        unit: product.unit || 'unidades',
         sizes: product.sizes.map((s) => ({ ...s })),
       });
       setUseCalculator(false);
@@ -140,7 +148,24 @@ export function ProductFormModal({ product, open, onClose }: ProductFormModalPro
     }));
   }
 
-  // ── Tamaños ─────────────────────────────────────────────────────────────────
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setUploading(true);
+    try {
+      const dataUrl = await fileToCompressedDataUrl(file, { maxWidth: 640, quality: 0.85 });
+      const { url } = await api.upload.image(dataUrl, 'products');
+      setForm((f) => ({ ...f, imageUrl: url }));
+    } catch (error) {
+      console.error('Error al subir imagen:', error);
+      alert('Error al subir imagen. Intenta nuevamente.');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  // ── Precios / Tamaños ─────────────────────────────────────────────────────────────────
   function addSize() {
     setForm((f) => ({
       ...f,
@@ -175,6 +200,7 @@ export function ProductFormModal({ product, open, onClose }: ProductFormModalPro
       basePrice: Number(form.basePrice) || 0,
       gradient: form.gradient,
       emoji: form.emoji,
+      imageUrl: form.imageUrl,
       sizes: form.sizes.map((s) => ({
         ...s,
         ounces: Number(s.ounces) || 0,
@@ -374,16 +400,16 @@ export function ProductFormModal({ product, open, onClose }: ProductFormModalPro
           />
         </div>
 
-        {/* ── Tamaños de vaso ──────────────────────────────────────────────── */}
+        {/* ── Variantes / Tamaños ──────────────────────────────────────────────── */}
         <div className="sm:col-span-2">
           <div className="mb-2 flex items-center justify-between">
-            <p className={fieldLabelClasses}>Tamaños del vaso</p>
+            <p className={fieldLabelClasses}>Variantes / Tamaños</p>
             <button
               type="button"
               onClick={addSize}
               className="flex items-center gap-1 rounded-lg bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-600 hover:bg-primary-100 transition-colors cursor-pointer dark:bg-primary-900/30 dark:text-primary-400"
             >
-              <Plus size={13} /> Agregar tamaño
+              <Plus size={13} /> Agregar variante
             </button>
           </div>
           <div className="space-y-2">
@@ -435,9 +461,65 @@ export function ProductFormModal({ product, open, onClose }: ProductFormModalPro
           </p>
         </div>
 
-        {/* ── Ícono ───────────────────────────────────────────────────────── */}
+        {/* ── Ícono / Imagen ───────────────────────────────────────────────────────── */}
         <div className="sm:col-span-2">
-          <p className={fieldLabelClasses}>Ícono</p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2 gap-2">
+            <p className={fieldLabelClasses}>Ícono o Foto</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => galleryInputRef.current?.click()}
+                className="flex items-center gap-1 rounded-lg bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-600 hover:bg-primary-100 transition-colors cursor-pointer dark:bg-primary-900/30 dark:text-primary-400"
+              >
+                <ImageIcon size={13} /> Subir de la galería
+              </button>
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                className="flex items-center gap-1 rounded-lg bg-primary-50 px-2.5 py-1 text-xs font-semibold text-primary-600 hover:bg-primary-100 transition-colors cursor-pointer dark:bg-primary-900/30 dark:text-primary-400"
+              >
+                <Camera size={13} /> Tomar foto
+              </button>
+            </div>
+            
+            <input 
+              ref={cameraInputRef} 
+              type="file" 
+              accept="image/*" 
+              capture="environment" 
+              className="hidden" 
+              onChange={handleImageUpload} 
+            />
+            <input 
+              ref={galleryInputRef} 
+              type="file" 
+              accept="image/*" 
+              className="hidden" 
+              onChange={handleImageUpload} 
+            />
+          </div>
+          
+          {uploading ? (
+            <div className="flex h-16 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary-300 bg-primary-50 text-sm font-bold text-ink dark:bg-primary-500/10 mb-4">
+              <Upload size={18} className="animate-pulse text-primary-500" />
+              Subiendo imagen...
+            </div>
+          ) : form.imageUrl ? (
+            <div className="mb-4 flex items-center gap-4 rounded-xl border border-border bg-field p-3">
+              <img src={form.imageUrl} alt="Producto" className="h-16 w-16 rounded-lg object-cover bg-white shadow-sm" />
+              <div className="flex flex-col gap-1">
+                <span className="text-sm font-semibold text-ink">Foto subida</span>
+                <button
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, imageUrl: '' }))}
+                  className="text-xs text-red-500 hover:text-red-700 hover:underline cursor-pointer text-left"
+                >
+                  Quitar foto (volver a emoji)
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-6 gap-2 sm:grid-cols-8">
             {EMOJI_OPTIONS.map((e) => (
               <button

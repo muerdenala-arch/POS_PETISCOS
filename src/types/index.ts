@@ -60,6 +60,7 @@ export interface Product {
   basePrice: number;
   gradient: string; // clases tailwind para la tarjeta
   emoji: string; // acento visual (no se usa como ícono funcional)
+  imageUrl?: string; // URL de la imagen en Cloudinary
   sizes: SizeOption[];
   toppingIds: string[];
   branchIds: string[];
