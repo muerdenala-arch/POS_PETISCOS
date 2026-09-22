@@ -1,10 +1,11 @@
 import { useState, type ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { BarChart3, LogOut, Package, ShieldCheck, Boxes, Users, QrCode, Store, Building2, Menu, X, Tag, Receipt } from 'lucide-react';
+import { BarChart3, LogOut, Package, ShieldCheck, Boxes, Users, QrCode, Store, Building2, Menu, X, Tag, Receipt, Warehouse } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { useBranchStore } from '@/store/branchStore';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { WarehouseAlertsButton } from '@/components/admin/WarehouseAlertsButton';
 import { fieldClasses } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 import { APP_CONFIG } from '@/config/app';
@@ -16,6 +17,7 @@ const NAV_ITEMS = [
   { to: '/admin/gastos', label: 'Gastos Diarios', icon: Receipt },
   { to: '/admin/catalogo', label: 'Catálogo', icon: Package },
   { to: '/admin/inventario', label: 'Inventario', icon: Boxes },
+  { to: '/admin/bodega', label: 'Bodega', icon: Warehouse },
   { to: '/admin/promociones', label: 'Promociones y Cupones', icon: Tag },
   { to: '/admin/personal', label: 'Personal / Cajeros', icon: Users },
   { to: '/admin/configuracion-qr', label: 'Configuración QR', icon: QrCode },
@@ -40,7 +42,10 @@ export function AdminShell({ children }: { children: ReactNode }) {
         <div className="h-8 w-8 flex-shrink-0 overflow-hidden rounded-full border border-primary-200 shadow-sm dark:border-primary-900/50">
           <img src={logoMark} alt={APP_CONFIG.storeName} className="h-full w-full object-cover" />
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          <WarehouseAlertsButton />
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* Sidebar fijo — solo >= lg. */}
@@ -118,7 +123,10 @@ function AdminSidebarContent({
             <X size={18} />
           </button>
         ) : (
-          <ThemeToggle />
+          <div className="flex items-center gap-1">
+            <WarehouseAlertsButton />
+            <ThemeToggle />
+          </div>
         )}
       </div>
 

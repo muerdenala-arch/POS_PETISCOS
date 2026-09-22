@@ -2,15 +2,51 @@ import type { VercelResponse } from '@vercel/node';
 import { query, queryOne, withTransaction } from './_lib/db.js';
 import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
 import { requireAuth, type AuthedRequest } from './_lib/auth.js';
-import type { Branch } from '../src/types/index.js';
+import type { AppSettings, Branch } from '../src/types/index.js';
 
 // Un solo archivo maneja la colección (/api/branches) y un ítem puntual
 // (/api/branches?id=xxx) — el plan Hobby de Vercel limita a 12 funciones
 // serverless por deployment, así que se fusiona index+[id] de cada recurso
-// en vez de un archivo por ruta.
+// en vez de un archivo por ruta. También se aprovecha para la configuración
+// general (/api/branches?resource=settings), que no amerita su propio archivo.
 const SELECT_COLUMNS = 'id, name, address, phone, active';
 
+async function handleSettings(req: AuthedRequest, res: VercelResponse): Promise<boolean> {
+  if (req.query.resource !== 'settings') return false;
+
+  if (req.method === 'GET') {
+    const settings = await queryOne<AppSettings>(
+      `select require_qr_receipt as "requireQrReceipt" from app_settings where id = 'global'`,
+    );
+    res.status(200).json(settings ?? { requireQrReceipt: true });
+    return true;
+  }
+
+  if (req.method === 'PATCH') {
+    if (req.user.role !== 'admin') {
+      res.status(403).json({ error: 'Solo un administrador puede cambiar la configuración.' });
+      return true;
+    }
+    const body = requireBody<Partial<AppSettings>>(req);
+    const settings = await queryOne<AppSettings>(
+      `update app_settings set
+         require_qr_receipt = coalesce($1, require_qr_receipt),
+         updated_at = now()
+       where id = 'global'
+       returning require_qr_receipt as "requireQrReceipt"`,
+      [body.requireQrReceipt ?? null],
+    );
+    res.status(200).json(settings);
+    return true;
+  }
+
+  methodNotAllowed(res, ['GET', 'PATCH']);
+  return true;
+}
+
 async function handler(req: AuthedRequest, res: VercelResponse) {
+  if (await handleSettings(req, res)) return;
+
   const id = typeof req.query.id === 'string' ? req.query.id : undefined;
 
   if (req.method === 'GET' && !id) {
@@ -83,6 +119,15 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
             stock_by_branch = stock_by_branch - $1
       `, [id]);
       await tx(`DELETE FROM toppings WHERE jsonb_array_length(branch_ids) = 0`);
+
+      // 4.5. Remove branch from warehouse items and delete if it was the only branch
+      // (warehouse_movements de esta sucursal se borran solos: ON DELETE CASCADE)
+      await tx(`
+        UPDATE warehouse_items
+        SET branch_ids = branch_ids - $1,
+            stock_by_branch = stock_by_branch - $1
+      `, [id]);
+      await tx(`DELETE FROM warehouse_items WHERE jsonb_array_length(branch_ids) = 0`);
 
       // 5. Remove branch from staff
       await tx(`

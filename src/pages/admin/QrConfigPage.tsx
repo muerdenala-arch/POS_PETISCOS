@@ -1,13 +1,15 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, QrCode as QrCodeIcon } from 'lucide-react';
+import { Plus, QrCode as QrCodeIcon, ShieldCheck, ToggleLeft, ToggleRight } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
+import { Card } from '@/components/ui/Card';
 import { QrCard } from '@/components/admin/QrCard';
 import { QrFormModal } from '@/components/admin/QrFormModal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button } from '@/components/ui/Button';
 import { useQrCodeStore } from '@/store/qrCodeStore';
 import { useBranchStore } from '@/store/branchStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { staggerContainer } from '@/lib/motion';
 import type { QrCode } from '@/types';
 
@@ -17,6 +19,8 @@ export default function QrConfigPage() {
   const removeQrCode = useQrCodeStore((s) => s.removeQrCode);
   const branches = useBranchStore((s) => s.branches);
   const adminFilterBranchId = useBranchStore((s) => s.adminFilterBranchId);
+  const requireQrReceipt = useSettingsStore((s) => s.requireQrReceipt);
+  const setRequireQrReceipt = useSettingsStore((s) => s.setRequireQrReceipt);
 
   const [editing, setEditing] = useState<QrCode | null | 'new'>(null);
   const [pendingDelete, setPendingDelete] = useState<QrCode | null>(null);
@@ -47,6 +51,27 @@ export default function QrConfigPage() {
             <Plus size={18} /> Nuevo QR
           </Button>
         </div>
+
+        <Card className="mb-6 flex items-center gap-4 p-4">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-600 dark:bg-primary-500/15">
+            <ShieldCheck size={20} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-display font-bold text-ink">Permisos de Cajero</p>
+            <p className="text-sm text-ink-muted">
+              {requireQrReceipt
+                ? 'El cajero debe adjuntar la foto del comprobante para cobrar por QR o Mixto.'
+                : 'El cajero puede cobrar por QR o Mixto sin adjuntar foto del comprobante.'}
+            </p>
+          </div>
+          <button
+            onClick={() => setRequireQrReceipt(!requireQrReceipt)}
+            className="flex-shrink-0 text-primary-500 hover:text-primary-700 cursor-pointer"
+            title={requireQrReceipt ? 'Exigir comprobante: activado' : 'Exigir comprobante: desactivado'}
+          >
+            {requireQrReceipt ? <ToggleRight size={30} /> : <ToggleLeft size={30} className="text-ink-soft" />}
+          </button>
+        </Card>
 
         {sorted.length === 0 ? (
           <div className="flex flex-col items-center gap-3 rounded-xl2 border-2 border-dashed border-border-strong bg-field py-16 text-center">

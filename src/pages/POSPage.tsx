@@ -14,6 +14,7 @@ import { useCatalogStore } from '@/store/catalogStore';
 import { useRegisterStore } from '@/store/registerStore';
 import { useSalesStore } from '@/store/salesStore';
 import { useCouponStore } from '@/store/couponStore';
+import { useWarehouseStore } from '@/store/warehouseStore';
 import { formatCurrency } from '@/lib/utils';
 import type { Payment, Product, Sale } from '@/types';
 
@@ -32,6 +33,9 @@ export default function POSPage() {
   const appliedCoupon = useCouponStore((s) => s.appliedCoupon);
   const discountAmountFn = useCouponStore((s) => s.discountAmount);
   const removeCoupon = useCouponStore((s) => s.removeCoupon);
+
+  const pendingDeliveries = useWarehouseStore((s) => s.pendingDeliveries);
+  const clearPendingDeliveries = useWarehouseStore((s) => s.clearPendingDeliveries);
 
   const addCartItem = useCartStore((s) => s.addItem);
 
@@ -86,6 +90,7 @@ export default function POSPage() {
       registerSessionId: activeSession!.id,
       branchId: currentBranchId!,
       createdAt: new Date().toISOString(),
+      warehouseDeliveries: pendingDeliveries.length > 0 ? pendingDeliveries : undefined,
     };
 
     // Optimistic: registra la venta INMEDIATAMENTE en el store local e IndexedDB.
@@ -100,6 +105,7 @@ export default function POSPage() {
 
     clearCart();
     removeCoupon();
+    clearPendingDeliveries();
     setCartDrawerOpen(false);
     setCheckoutOpen(false);
 
@@ -134,7 +140,7 @@ export default function POSPage() {
 
       {/* Barra inferior fija con el resumen de la orden — abre el drawer, no cobra directo,
           así el cajero puede revisar/editar ítems antes de pasar a Cobrar. */}
-      {items.length > 0 && !cartDrawerOpen && (
+      {(items.length > 0 || pendingDeliveries.length > 0) && !cartDrawerOpen && (
         <motion.button
           initial={{ y: 80, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}

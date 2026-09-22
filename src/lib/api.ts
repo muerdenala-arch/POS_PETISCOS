@@ -2,6 +2,7 @@
 // como fuente de verdad. Mismo origen en producción y en `vercel dev` local, así que no
 // hace falta configurar una URL base.
 import type {
+  AppSettings,
   Branch,
   CashRegisterSession,
   Coupon,
@@ -13,6 +14,8 @@ import type {
   User,
   Category,
   Expense,
+  WarehouseItem,
+  WarehouseMovement,
 } from '@/types';
 
 // Si Neon/la función serverless se cuelga (cold start, pool sin responder), sin esto el
@@ -156,5 +159,25 @@ export const api = {
   expenses: {
     list: () => get<Expense[]>('/expenses'),
     create: (data: Expense) => post<Expense>('/expenses', data),
+  },
+  settings: {
+    get: () => get<AppSettings>('/branches?resource=settings'),
+    update: (data: Partial<AppSettings>) => patch<AppSettings>('/branches?resource=settings', data),
+  },
+  warehouse: {
+    items: {
+      list: () => get<WarehouseItem[]>('/toppings?resource=warehouse-items'),
+      create: (data: WarehouseItem) => post<WarehouseItem>('/toppings?resource=warehouse-items', data),
+      update: (id: string, data: Partial<WarehouseItem>) =>
+        patch<WarehouseItem>(`/toppings?resource=warehouse-items&id=${encodeURIComponent(id)}`, data),
+      remove: (id: string) => del(`/toppings?resource=warehouse-items&id=${encodeURIComponent(id)}`),
+    },
+    movements: {
+      list: (itemId?: string) =>
+        get<WarehouseMovement[]>(`/toppings?resource=warehouse-movements${itemId ? `&itemId=${encodeURIComponent(itemId)}` : ''}`),
+      /** Ajuste manual de stock (entrada o salida) hecho por un administrador. */
+      create: (data: { itemId: string; branchId: string; type: 'entrada' | 'salida'; quantity: number; note?: string }) =>
+        post<{ ok: true; id: string }>('/toppings?resource=warehouse-movements', data),
+    },
   },
 };

@@ -7,6 +7,7 @@ import { cn, formatCurrency } from '@/lib/utils';
 import { fileToCompressedDataUrl } from '@/lib/image';
 import { useQrCodeStore } from '@/store/qrCodeStore';
 import { useAuthStore } from '@/store/authStore';
+import { useSettingsStore } from '@/store/settingsStore';
 import { APP_CONFIG } from '@/config/app';
 import { api } from '@/lib/api';
 import type { Payment, PaymentMethod } from '@/types';
@@ -21,6 +22,7 @@ interface CheckoutModalProps {
 export function CheckoutModal({ open, total, onClose, onConfirm }: CheckoutModalProps) {
   const currentBranchId = useAuthStore((s) => s.currentBranchId);
   const activeQr = useQrCodeStore((s) => (currentBranchId ? s.activeQrCodeForBranch(currentBranchId) : null));
+  const requireQrReceipt = useSettingsStore((s) => s.requireQrReceipt);
   const [method, setMethod] = useState<PaymentMethod>('efectivo');
   const [amountEfectivo, setAmountEfectivo] = useState<string>('');
   const [receiptImage, setReceiptImage] = useState<string | null>(null);
@@ -88,10 +90,13 @@ export function CheckoutModal({ open, total, onClose, onConfirm }: CheckoutModal
   const receivedNum = Number(receivedCash) || 0;
   const changeAmount = receivedNum - total;
   
+  // Si la configuración no exige comprobante (ver Configuración QR en el panel de
+  // admin), el cajero puede cobrar por QR/mixto sin adjuntar foto.
+  const hasReceiptIfRequired = !requireQrReceipt || !!receiptImage;
   const canConfirm = !confirming && (
-    (method === 'efectivo' && receivedNum >= total) 
-    || (method === 'qr' && !!receiptImage) 
-    || (method === 'mixto' && !!receiptImage && Number(amountEfectivo) > 0 && qrAmount > 0)
+    (method === 'efectivo' && receivedNum >= total)
+    || (method === 'qr' && hasReceiptIfRequired)
+    || (method === 'mixto' && hasReceiptIfRequired && Number(amountEfectivo) > 0 && qrAmount > 0)
   );
 
   return (
@@ -239,6 +244,7 @@ export function CheckoutModal({ open, total, onClose, onConfirm }: CheckoutModal
               <ReceiptUploader
                 receiptImage={receiptImage}
                 error={uploadError}
+                required={requireQrReceipt}
                 fileInputRef={fileInputRef}
                 onFileChange={handleFileChange}
                 onRemove={() => {
@@ -283,12 +289,14 @@ export function CheckoutModal({ open, total, onClose, onConfirm }: CheckoutModal
 function ReceiptUploader({
   receiptImage,
   error,
+  required,
   fileInputRef,
   onFileChange,
   onRemove,
 }: {
   receiptImage: string | null;
   error: string | null;
+  required: boolean;
   fileInputRef: React.RefObject<HTMLInputElement>;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemove: () => void;
@@ -335,7 +343,9 @@ function ReceiptUploader({
           className="flex min-h-touch-lg w-full flex-col items-center justify-center gap-1.5 rounded-xl2 border-2 border-dashed border-border-strong bg-field px-4 py-6 text-center transition-colors hover:border-primary-400 hover:bg-primary-50 dark:hover:bg-primary-500/10 cursor-pointer"
         >
           <Camera size={26} className="text-primary-500" />
-          <span className="font-display text-sm font-bold text-ink">Tomar foto / Subir comprobante</span>
+          <span className="font-display text-sm font-bold text-ink">
+            Tomar foto / Subir comprobante{!required && ' (opcional)'}
+          </span>
           <span className="text-xs text-ink-soft">Foto de la transferencia o captura de pantalla</span>
         </button>
       )}

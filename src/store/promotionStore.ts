@@ -16,6 +16,19 @@ interface PromotionState {
   activePromotionFor: (product: { id: string; category: string; sizeId?: string }, branchId: string) => Promotion | null;
 }
 
+/** Fecha de hoy en Bolivia como "YYYY-MM-DD" (no la del huso horario del dispositivo)
+ *  — comparable directo contra starts_at/ends_at, que se guardan en el mismo formato. */
+function todayInBolivia(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
+}
+
+function isWithinDateRange(promo: Pick<Promotion, 'startDate' | 'endDate'>): boolean {
+  const today = todayInBolivia();
+  if (promo.startDate && today < promo.startDate) return false;
+  if (promo.endDate && today > promo.endDate) return false;
+  return true;
+}
+
 export const usePromotionStore = create<PromotionState>()((set, get) => ({
   promotions: [],
   hydrated: false,
@@ -74,8 +87,9 @@ export const usePromotionStore = create<PromotionState>()((set, get) => ({
         (p) =>
           p.isActive &&
           p.branchIds.includes(branchId) &&
-          (p.appliesTo === 'ALL' || 
-           p.appliesTo === product.category || 
+          isWithinDateRange(p) &&
+          (p.appliesTo === 'ALL' ||
+           p.appliesTo === product.category ||
            p.appliesTo === `PRODUCT:${product.id}` ||
            (!!product.sizeId && p.appliesTo === `SIZE:${product.id}:${product.sizeId}`))
       ) ?? null

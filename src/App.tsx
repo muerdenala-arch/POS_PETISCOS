@@ -23,6 +23,7 @@ const QrConfigPage = lazy(() => import('@/pages/admin/QrConfigPage'));
 const BranchesPage = lazy(() => import('@/pages/admin/BranchesPage'));
 const PromotionsPage = lazy(() => import('@/pages/admin/PromotionsPage'));
 const ExpensesPage = lazy(() => import('@/pages/admin/ExpensesPage'));
+const BodegaPage = lazy(() => import('@/pages/admin/BodegaPage'));
 
 // Si a los 10s la primera sincronización con Neon todavía no terminó (DB caída, env var
 // faltante, función colgada), dejamos de mostrar el spinner infinito y ofrecemos
@@ -124,6 +125,14 @@ export default function App() {
         element={
           <RequireAuth roles={['admin']}>
             <BranchesPage />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/bodega"
+        element={
+          <RequireAuth roles={['admin']}>
+            <BodegaPage />
           </RequireAuth>
         }
       />

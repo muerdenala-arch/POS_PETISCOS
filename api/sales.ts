@@ -2,7 +2,7 @@ import type { VercelResponse } from '@vercel/node';
 import { query, withTransaction } from './_lib/db.js';
 import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
 import { requireAuth, type AuthedRequest } from './_lib/auth.js';
-import { amountsMatch, computeCouponDiscount, recomputeItemPricing } from './_lib/pricing.js';
+import { amountsMatch, applyWarehouseDeliveries, computeCouponDiscount, recomputeItemPricing } from './_lib/pricing.js';
 import type { Sale, CashRegisterSession } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
@@ -12,7 +12,8 @@ const SELECT_COLUMNS = `
   coupon_code as "couponCode",
   total, payment,
   cashier_id as "cashierId", cashier_name as "cashierName",
-  register_session_id as "registerSessionId", branch_id as "branchId", created_at as "createdAt"
+  register_session_id as "registerSessionId", branch_id as "branchId", created_at as "createdAt",
+  warehouse_deliveries as "warehouseDeliveries"
 `;
 
 async function handler(req: AuthedRequest, res: VercelResponse) {
@@ -148,12 +149,16 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
         return null;
       }
 
+      if ((!body.items || body.items.length === 0) && (!body.warehouseDeliveries || body.warehouseDeliveries.length === 0)) {
+        throw new Error('La venta no tiene ítems ni entregas de bodega.');
+      }
+
       // Recalcula precios, tamaños, toppings y promoción vigente desde el catálogo
       // real de la base — nunca se confía en los precios que manda el cliente, para
       // que una API modificada (o una llamada directa) no pueda registrar una venta
       // con un total distinto al que corresponde de verdad.
       const { items: recomputedItems, subtotal, subtotalBeforeDiscount, categoryOf } =
-        await recomputeItemPricing(body.items, body.branchId);
+        await recomputeItemPricing(body.items ?? [], body.branchId);
 
       // Quemar el cupón atómicamente si fue utilizado en esta venta
       let discountAmount = 0;
@@ -206,12 +211,15 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
         );
       }
 
-      return tx<Sale>(
+      // La fila de sales debe existir ANTES de registrar movimientos de bodega, porque
+      // warehouse_movements.sale_id referencia sales(id) — insertamos primero (sin
+      // deliveries todavía) y actualizamos con el snapshot una vez procesadas.
+      const inserted = await tx<Sale>(
         `INSERT INTO sales (
            id, items, subtotal, subtotal_before_discount, discount_amount, discount_type, coupon_code,
-           total, payment, cashier_id, cashier_name, register_session_id, branch_id
+           total, payment, cashier_id, cashier_name, register_session_id, branch_id, warehouse_deliveries
          )
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, '[]')
          RETURNING ${SELECT_COLUMNS}`,
         [
           body.id,
@@ -229,6 +237,23 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
           body.branchId,
         ]
       );
+
+      // Entregas de bodega (sin costo) asociadas a esta venta — descuenta stock y
+      // registra el movimiento en la misma transacción, para que nunca quede una
+      // venta guardada sin su entrega, ni una entrega sin su venta.
+      const warehouseDeliveries = await applyWarehouseDeliveries(
+        tx,
+        body.warehouseDeliveries,
+        body.branchId,
+        body.id,
+        { id: req.user.id, name: req.user.name },
+      );
+
+      if (warehouseDeliveries.length > 0) {
+        await tx('UPDATE sales SET warehouse_deliveries = $2 WHERE id = $1', [body.id, JSON.stringify(warehouseDeliveries)]);
+      }
+
+      return [{ ...inserted[0], warehouseDeliveries }];
     });
 
     if (!rows) return; // 409 ya enviado arriba

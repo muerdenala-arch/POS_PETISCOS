@@ -8,6 +8,8 @@ import { useSalesStore } from '@/store/salesStore';
 import { usePromotionStore } from '@/store/promotionStore';
 import { useExpenseStore } from '@/store/expenseStore';
 import { useCouponStore } from '@/store/couponStore';
+import { useSettingsStore } from '@/store/settingsStore';
+import { useWarehouseStore } from '@/store/warehouseStore';
 
 const POLL_INTERVAL_MS = 60000;
 
@@ -29,6 +31,8 @@ export function useDataSync(enabled: boolean) {
         usePromotionStore.getState().fetchAll();
         useExpenseStore.getState().fetchAll();
         useCouponStore.getState().fetchAll();
+        useSettingsStore.getState().fetchAll();
+        useWarehouseStore.getState().fetchAll();
         isInitial = false;
       } else {
         // Desfasar peticiones en background para evitar bloquear el hilo principal (tironazo en la UI)
@@ -41,6 +45,8 @@ export function useDataSync(enabled: boolean) {
         setTimeout(() => usePromotionStore.getState().fetchAll(), 3000);
         setTimeout(() => useExpenseStore.getState().fetchAll(), 3500);
         setTimeout(() => useCouponStore.getState().fetchAll(), 4000);
+        setTimeout(() => useSettingsStore.getState().fetchAll(), 4500);
+        setTimeout(() => useWarehouseStore.getState().fetchAll(), 5000);
       }
     };
 
@@ -81,5 +87,10 @@ export function useIsDataHydrated(): boolean {
   const expenses = useExpenseStore((s) => s.hydrated);
   const promotions = usePromotionStore((s) => s.hydrated);
   const coupons = useCouponStore((s) => s.hydrated);
-  return branches && staff && catalog && qrCodes && registerSessions && sales && expenses && promotions && coupons;
+  const settings = useSettingsStore((s) => s.hydrated);
+  const warehouse = useWarehouseStore((s) => s.hydrated);
+  return (
+    branches && staff && catalog && qrCodes && registerSessions && sales && expenses && promotions && coupons &&
+    settings && warehouse
+  );
 }

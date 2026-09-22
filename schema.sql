@@ -167,9 +167,23 @@ CREATE TABLE IF NOT EXISTS promotions (
   applies_to     text NOT NULL DEFAULT 'ALL',
   branch_ids     jsonb NOT NULL DEFAULT '[]',
   is_active      boolean NOT NULL DEFAULT true,
+  -- Si son NULL, la promo no tiene límite de fechas (además de tener que estar
+  -- is_active). Si ambas están, solo aplica dentro de ese rango, inclusive.
+  starts_at      date,
+  ends_at        date,
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now()
 );
+
+DO $$ BEGIN
+  ALTER TABLE promotions ADD COLUMN IF NOT EXISTS starts_at date;
+  ALTER TABLE promotions ADD COLUMN IF NOT EXISTS ends_at date;
+END $$;
+
+DO $$ BEGIN
+  ALTER TABLE promotions ADD CONSTRAINT promotions_date_range_valid
+    CHECK (starts_at IS NULL OR ends_at IS NULL OR ends_at >= starts_at);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ── Cupones ──────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS coupons (
@@ -248,3 +262,79 @@ DO $$ BEGIN
   ALTER TABLE coupons ADD CONSTRAINT coupons_non_negative
     CHECK (discount_value >= 0 AND max_uses > 0 AND used_count >= 0);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ── Configuración general (una sola fila) ──────────────────────────────────────
+CREATE TABLE IF NOT EXISTS app_settings (
+  id                 text PRIMARY KEY DEFAULT 'global',
+  -- Si es false, el cajero puede cobrar por QR/mixto sin adjuntar foto del
+  -- comprobante (ver api/branches.ts?resource=settings y CheckoutModal.tsx).
+  require_qr_receipt boolean NOT NULL DEFAULT true,
+  updated_at         timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO app_settings (id) VALUES ('global') ON CONFLICT (id) DO NOTHING;
+
+-- ── Bodega: insumos separados del catálogo de venta (ej. harinas, envases) ─────
+CREATE TABLE IF NOT EXISTS warehouse_items (
+  id                  text PRIMARY KEY,
+  name                text NOT NULL,
+  unit                text NOT NULL DEFAULT 'unidades',
+  stock_by_branch     jsonb NOT NULL DEFAULT '{}',
+  low_stock_threshold integer NOT NULL DEFAULT 0,
+  branch_ids          jsonb NOT NULL DEFAULT '[]',
+  created_at          timestamptz NOT NULL DEFAULT now(),
+  updated_at          timestamptz NOT NULL DEFAULT now()
+);
+
+DO $$ BEGIN
+  ALTER TABLE warehouse_items ADD CONSTRAINT warehouse_items_threshold_non_negative
+    CHECK (low_stock_threshold >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ── Bodega: historial de movimientos (entrada = ajuste manual, salida = entrega) ─
+-- item_id NO tiene foreign key a propósito: si se borra el insumo, el historial de
+-- movimientos ya hechos debe seguir existiendo tal cual (item_name queda guardado
+-- acá mismo, no se hace join en vivo contra warehouse_items).
+-- branch_id: ON DELETE CASCADE — si se borra la sucursal, se borra su historial de
+-- bodega junto con sus ventas y cajas (mismo criterio que ya usa el DELETE de
+-- api/branches.ts para sales/register_sessions: fue un pedido explícito del dueño).
+-- sale_id: ON DELETE SET NULL — el movimiento de stock en sí siempre queda (es real
+-- y ya ocurrió), pero pierde el vínculo si la venta puntual se borra.
+CREATE TABLE IF NOT EXISTS warehouse_movements (
+  id         text PRIMARY KEY,
+  item_id    text NOT NULL,
+  item_name  text NOT NULL,
+  branch_id  text NOT NULL REFERENCES branches (id) ON DELETE CASCADE,
+  type       text NOT NULL CHECK (type IN ('entrada', 'salida')),
+  quantity   integer NOT NULL CHECK (quantity > 0),
+  user_id    text NOT NULL REFERENCES staff (id),
+  user_name  text NOT NULL,
+  note       text,
+  sale_id    text REFERENCES sales (id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+-- Migración para una base que ya haya creado warehouse_movements con la forma
+-- anterior (con foreign key a item_id y sin item_name, o sin ON DELETE en
+-- branch_id/sale_id).
+DO $$ BEGIN
+  ALTER TABLE warehouse_movements ADD COLUMN IF NOT EXISTS item_name text;
+  UPDATE warehouse_movements m SET item_name = i.name
+    FROM warehouse_items i WHERE m.item_id = i.id AND m.item_name IS NULL;
+  UPDATE warehouse_movements SET item_name = '(insumo eliminado)' WHERE item_name IS NULL;
+  ALTER TABLE warehouse_movements ALTER COLUMN item_name SET NOT NULL;
+  ALTER TABLE warehouse_movements DROP CONSTRAINT IF EXISTS warehouse_movements_item_id_fkey;
+  ALTER TABLE warehouse_movements DROP CONSTRAINT IF EXISTS warehouse_movements_branch_id_fkey;
+  ALTER TABLE warehouse_movements ADD CONSTRAINT warehouse_movements_branch_id_fkey
+    FOREIGN KEY (branch_id) REFERENCES branches (id) ON DELETE CASCADE;
+  ALTER TABLE warehouse_movements DROP CONSTRAINT IF EXISTS warehouse_movements_sale_id_fkey;
+  ALTER TABLE warehouse_movements ADD CONSTRAINT warehouse_movements_sale_id_fkey
+    FOREIGN KEY (sale_id) REFERENCES sales (id) ON DELETE SET NULL;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_warehouse_movements_item ON warehouse_movements (item_id);
+CREATE INDEX IF NOT EXISTS idx_warehouse_movements_branch ON warehouse_movements (branch_id);
+CREATE INDEX IF NOT EXISTS idx_warehouse_movements_created_at ON warehouse_movements (created_at DESC);
+
+-- Snapshot de lo entregado de bodega en esa venta (para el ticket) — la fuente de
+-- verdad del stock/historial es warehouse_movements, esto es solo para mostrar.
+ALTER TABLE sales ADD COLUMN IF NOT EXISTS warehouse_deliveries jsonb NOT NULL DEFAULT '[]';

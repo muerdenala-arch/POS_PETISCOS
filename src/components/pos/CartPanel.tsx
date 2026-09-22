@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Minus, Plus, ShoppingCart, Tag, Trash2, X } from 'lucide-react';
+import { Minus, Plus, ShoppingCart, Tag, Trash2, Warehouse, X } from 'lucide-react';
 import { useCartStore } from '@/store/cartStore';
 import { useCouponStore } from '@/store/couponStore';
 import { Button } from '@/components/ui/Button';
 import { useCatalogStore } from '@/store/catalogStore';
+import { useWarehouseStore } from '@/store/warehouseStore';
+import { WarehouseDeliveryModal } from '@/components/pos/WarehouseDeliveryModal';
 import { cn, formatCurrency } from '@/lib/utils';
 
 interface CartPanelProps {
@@ -31,6 +33,10 @@ export function CartPanel({ onCheckout, branchId, variant = 'sidebar' }: CartPan
 
   const [couponInputOpen, setCouponInputOpen] = useState(false);
   const [couponCode, setCouponCode] = useState('');
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+
+  const pendingDeliveries = useWarehouseStore((s) => s.pendingDeliveries);
+  const removePendingDelivery = useWarehouseStore((s) => s.removePendingDelivery);
 
   const couponDiscount = discountAmount(items);
   const total = Math.max(0, subtotal - couponDiscount);
@@ -268,10 +274,45 @@ export function CartPanel({ onCheckout, branchId, variant = 'sidebar' }: CartPan
           </div>
         </div>
 
-        <Button size="lg" className="w-full" disabled={items.length === 0} onClick={onCheckout}>
+        {/* Entregas de bodega (sin costo) pendientes para esta orden */}
+        {pendingDeliveries.length > 0 && (
+          <div className="mb-3 space-y-1.5 rounded-xl border border-dashed border-border bg-cream-100 p-2.5">
+            {pendingDeliveries.map((d) => (
+              <div key={d.itemId} className="flex items-center justify-between gap-2 text-xs">
+                <span className="flex items-center gap-1.5 font-semibold text-ink">
+                  <Warehouse size={12} className="text-ink-soft" /> {d.itemName} × {d.quantity}
+                </span>
+                <button
+                  onClick={() => removePendingDelivery(d.itemId)}
+                  className="text-ink-soft hover:text-red-600 cursor-pointer"
+                  aria-label="Quitar entrega"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <button
+          onClick={() => setDeliveryModalOpen(true)}
+          className="mb-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed border-border py-2 text-xs font-semibold text-ink-muted hover:border-primary-400 hover:bg-primary-50 hover:text-primary-600 cursor-pointer transition-colors"
+        >
+          <Warehouse size={13} />
+          Entregar de bodega
+        </button>
+
+        <Button
+          size="lg"
+          className="w-full"
+          disabled={items.length === 0 && pendingDeliveries.length === 0}
+          onClick={onCheckout}
+        >
           Cobrar
         </Button>
       </div>
+
+      <WarehouseDeliveryModal open={deliveryModalOpen} branchId={branchId} onClose={() => setDeliveryModalOpen(false)} />
     </div>
   );
 }

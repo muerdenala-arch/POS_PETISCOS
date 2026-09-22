@@ -105,6 +105,9 @@ export interface Promotion {
   appliesTo: string;
   branchIds: string[];
   isActive: boolean;
+  /** YYYY-MM-DD. Si están definidas, la promo solo aplica dentro de ese rango. */
+  startDate?: string | null;
+  endDate?: string | null;
   createdAt: string;
 }
 
@@ -158,6 +161,14 @@ export interface Sale {
   registerSessionId: string;
   branchId: string;
   createdAt: string;
+  /** Insumos de bodega entregados junto con esta venta (sin costo) — snapshot para el ticket. */
+  warehouseDeliveries?: WarehouseDelivery[];
+}
+
+export interface WarehouseDelivery {
+  itemId: string;
+  itemName: string;
+  quantity: number;
 }
 
 export interface QrCode {
@@ -199,5 +210,38 @@ export interface Expense {
   registerSessionId?: string | null;
   branchId?: string | null;
   userId: string;
+  createdAt: string;
+}
+
+export interface AppSettings {
+  /** Si es false, el cajero puede cobrar por QR/mixto sin foto de comprobante. */
+  requireQrReceipt: boolean;
+}
+
+/** Insumo de bodega — separado del catálogo de venta (ej. harinas, envases). */
+export interface WarehouseItem {
+  id: string;
+  name: string;
+  unit: string;
+  /** Stock independiente por sucursal: { [branchId]: cantidad }. */
+  stockByBranch: Record<string, number>;
+  lowStockThreshold: number;
+  branchIds: string[];
+  createdAt: string;
+}
+
+export type WarehouseMovementType = 'entrada' | 'salida';
+
+export interface WarehouseMovement {
+  id: string;
+  itemId: string;
+  itemName: string;
+  branchId: string;
+  type: WarehouseMovementType;
+  quantity: number;
+  userId: string;
+  userName: string;
+  note?: string | null;
+  saleId?: string | null;
   createdAt: string;
 }

@@ -20,6 +20,8 @@ type PromoForm = {
   discountValue: string;
   appliesTo: string;
   branchIds: string[];
+  startDate: string;
+  endDate: string;
 };
 
 type CouponForm = {
@@ -32,12 +34,21 @@ type CouponForm = {
   branchId: string;
 };
 
+/** Formatea un "YYYY-MM-DD" sin pasar por `new Date(string)` (que lo interpretaría
+ *  como UTC y podría mostrar un día antes en un huso horario negativo como Bolivia). */
+function formatDateOnly(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 const defaultPromoForm: PromoForm = {
   name: '',
   discountType: 'PERCENTAGE',
   discountValue: '',
   appliesTo: 'ALL',
   branchIds: [],
+  startDate: '',
+  endDate: '',
 };
 
 const defaultCouponForm: CouponForm = {
@@ -65,9 +76,19 @@ export default function PromotionsPage() {
   const [savingPromo, setSavingPromo] = useState(false);
   const [savingCoupon, setSavingCoupon] = useState(false);
   const [couponError, setCouponError] = useState<string | null>(null);
+  const [promoError, setPromoError] = useState<string | null>(null);
 
   async function handleCreatePromo() {
     if (!promoForm.name || !promoForm.discountValue || promoForm.branchIds.length === 0) return;
+    if (!promoForm.startDate || !promoForm.endDate) {
+      setPromoError('Elige la fecha de inicio y la fecha de fin de la promoción.');
+      return;
+    }
+    if (promoForm.endDate < promoForm.startDate) {
+      setPromoError('La fecha de fin debe ser igual o posterior a la fecha de inicio.');
+      return;
+    }
+    setPromoError(null);
     setSavingPromo(true);
     await createPromotion({
       name: promoForm.name,
@@ -76,6 +97,8 @@ export default function PromotionsPage() {
       appliesTo: promoForm.appliesTo,
       branchIds: promoForm.branchIds,
       isActive: true,
+      startDate: promoForm.startDate,
+      endDate: promoForm.endDate,
     });
     setPromoForm(defaultPromoForm);
     setPromoModalOpen(false);
@@ -153,7 +176,7 @@ export default function PromotionsPage() {
         {tab === 'promos' && (
           <div>
             <div className="mb-4 flex justify-end">
-              <Button onClick={() => setPromoModalOpen(true)} className="gap-2">
+              <Button onClick={() => { setPromoModalOpen(true); setPromoError(null); }} className="gap-2">
                 <Plus size={16} /> Nueva Promoción
               </Button>
             </div>
@@ -179,6 +202,11 @@ export default function PromotionsPage() {
                         {' · '}
                         {branches.filter((b) => promo.branchIds.includes(b.id)).map((b) => b.name).join(', ')}
                       </p>
+                      {(promo.startDate || promo.endDate) && (
+                        <p className="mt-0.5 text-xs text-ink-soft">
+                          📅 {promo.startDate ? formatDateOnly(promo.startDate) : '—'} al {promo.endDate ? formatDateOnly(promo.endDate) : '—'}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge tone={promo.isActive ? 'primary' : 'neutral'}>
@@ -377,11 +405,40 @@ export default function PromotionsPage() {
             </div>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-xs font-bold text-ink-muted uppercase tracking-wide">Fecha de inicio</label>
+              <input
+                type="date"
+                value={promoForm.startDate}
+                onChange={(e) => { setPromoError(null); setPromoForm((f) => ({ ...f, startDate: e.target.value })); }}
+                className="w-full rounded-xl border border-border bg-field px-3 py-2.5 text-sm text-ink focus:border-primary-400 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-bold text-ink-muted uppercase tracking-wide">Fecha de fin</label>
+              <input
+                type="date"
+                min={promoForm.startDate || undefined}
+                value={promoForm.endDate}
+                onChange={(e) => { setPromoError(null); setPromoForm((f) => ({ ...f, endDate: e.target.value })); }}
+                className="w-full rounded-xl border border-border bg-field px-3 py-2.5 text-sm text-ink focus:border-primary-400 focus:outline-none"
+              />
+            </div>
+          </div>
+
+          {promoError && (
+            <div className="flex items-center gap-2 rounded-xl bg-red-50 border border-red-200 px-4 py-3">
+              <AlertTriangle size={16} className="text-red-600 flex-shrink-0" />
+              <p className="text-sm font-semibold text-red-700">{promoError}</p>
+            </div>
+          )}
+
           <div className="flex gap-3 pt-2">
             <Button variant="outline" onClick={() => setPromoModalOpen(false)} className="flex-1">Cancelar</Button>
             <Button
               onClick={handleCreatePromo}
-              disabled={savingPromo || !promoForm.name || !promoForm.discountValue || promoForm.branchIds.length === 0}
+              disabled={savingPromo || !promoForm.name || !promoForm.discountValue || promoForm.branchIds.length === 0 || !promoForm.startDate || !promoForm.endDate}
               className="flex-1"
             >
               {savingPromo ? 'Guardando...' : 'Crear Promoción'}

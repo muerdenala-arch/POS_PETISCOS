@@ -38,7 +38,7 @@ export async function queryOne<T extends QueryResultRow = QueryResultRow>(
   return rows[0] ?? null;
 }
 
-type TxQuery = <T extends QueryResultRow = QueryResultRow>(text: string, params?: unknown[]) => Promise<T[]>;
+export type TxQuery = <T extends QueryResultRow = QueryResultRow>(text: string, params?: unknown[]) => Promise<T[]>;
 
 /** Para operaciones que deben ser atómicas (ej. "solo un QR activo por sucursal": apagar
  *  todos y prender uno en la misma transacción, sin ventana donde queden 0 o 2 activos). */

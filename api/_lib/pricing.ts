@@ -1,5 +1,5 @@
-import { query } from './db.js';
-import type { CartItem, Promotion } from '../../src/types/index.js';
+import { query, type TxQuery } from './db.js';
+import type { CartItem, Promotion, WarehouseDelivery } from '../../src/types/index.js';
 
 /** Tolerancia para comparar montos recalculados contra los que manda el cliente —
  *  cubre redondeos de punto flotante, no una brecha real de precio. */
@@ -32,6 +32,19 @@ function applyPromoDiscount(price: number, promo: Promotion | null): number {
   return Math.max(0, price - promo.discountValue);
 }
 
+/** Fecha de hoy en Bolivia como "YYYY-MM-DD" — misma función que en
+ *  src/store/promotionStore.ts, comparable directo contra starts_at/ends_at. */
+function todayInBolivia(): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'America/La_Paz' });
+}
+
+function isWithinDateRange(promo: Pick<Promotion, 'startDate' | 'endDate'>): boolean {
+  const today = todayInBolivia();
+  if (promo.startDate && today < promo.startDate) return false;
+  if (promo.endDate && today > promo.endDate) return false;
+  return true;
+}
+
 /** Misma regla de selección que `activePromotionFor` en src/store/promotionStore.ts. */
 function findActivePromotion(
   promotions: Promotion[],
@@ -44,6 +57,7 @@ function findActivePromotion(
       (p) =>
         p.isActive &&
         p.branchIds.includes(branchId) &&
+        isWithinDateRange(p) &&
         (p.appliesTo === 'ALL' ||
           p.appliesTo === product.category ||
           p.appliesTo === `PRODUCT:${product.id}` ||
@@ -74,8 +88,13 @@ export interface RecomputedPricing {
  * pertenece a la sucursal de la venta.
  */
 export async function recomputeItemPricing(items: CartItem[], branchId: string): Promise<RecomputedPricing> {
-  if (!Array.isArray(items) || items.length === 0) {
+  if (!Array.isArray(items)) {
     throw new Error('La venta no tiene ítems.');
+  }
+  // Un carrito vacío es válido cuando la "venta" es solo una entrega de bodega sin
+  // costo (ver api/sales.ts) — en ese caso no hay nada que recalcular.
+  if (items.length === 0) {
+    return { items: [], subtotal: 0, subtotalBeforeDiscount: 0, categoryOf: () => '' };
   }
 
   const productIds = [...new Set(items.map((i) => i.product?.id))];
@@ -91,7 +110,8 @@ export async function recomputeItemPricing(items: CartItem[], branchId: string):
       : Promise.resolve([] as DbToppingRow[]),
     query<Promotion>(
       `select id, name, discount_type as "discountType", discount_value as "discountValue",
-         applies_to as "appliesTo", branch_ids as "branchIds", is_active as "isActive", created_at as "createdAt"
+         applies_to as "appliesTo", branch_ids as "branchIds", is_active as "isActive",
+         starts_at::text as "startDate", ends_at::text as "endDate", created_at as "createdAt"
        from promotions order by created_at desc`,
     ),
   ]);
@@ -199,4 +219,56 @@ export function computeCouponDiscount(
 
 export function amountsMatch(a: number, b: number): boolean {
   return Math.abs(a - b) <= AMOUNT_EPSILON;
+}
+
+/**
+ * Valida y descuenta (dentro de la MISMA transacción que la venta) los insumos de
+ * bodega entregados junto con esta venta, sin costo. Tira un Error (mensaje para el
+ * cajero) si un insumo no existe, no pertenece a la sucursal, o no hay stock
+ * suficiente. Devuelve el snapshot para guardar en sales.warehouse_deliveries.
+ */
+export async function applyWarehouseDeliveries(
+  tx: TxQuery,
+  deliveries: WarehouseDelivery[] | undefined,
+  branchId: string,
+  saleId: string,
+  user: { id: string; name: string },
+): Promise<WarehouseDelivery[]> {
+  if (!deliveries || deliveries.length === 0) return [];
+
+  const snapshot: WarehouseDelivery[] = [];
+  for (const delivery of deliveries) {
+    if (!delivery.itemId || !Number.isInteger(delivery.quantity) || delivery.quantity <= 0) {
+      throw new Error('Cantidad inválida en una entrega de bodega.');
+    }
+
+    const rows = await tx<{ name: string; stock_by_branch: Record<string, number>; branch_ids: string[] }>(
+      'select name, stock_by_branch, branch_ids from warehouse_items where id = $1 for update',
+      [delivery.itemId],
+    );
+    const item = rows[0];
+    if (!item) throw new Error(`Insumo de bodega no encontrado: ${delivery.itemName ?? delivery.itemId}.`);
+    if (!item.branch_ids.includes(branchId)) {
+      throw new Error(`"${item.name}" no está disponible en esta sucursal.`);
+    }
+    const current = Number(item.stock_by_branch[branchId] ?? 0);
+    const next = current - delivery.quantity;
+    if (next < 0) {
+      throw new Error(`No hay suficiente stock de "${item.name}" en bodega (quedan ${current}).`);
+    }
+
+    await tx(
+      `update warehouse_items set stock_by_branch = jsonb_set(stock_by_branch, $2, to_jsonb($3::int), true), updated_at = now() where id = $1`,
+      [delivery.itemId, `{${branchId}}`, next],
+    );
+    const movementId = `whm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    await tx(
+      `insert into warehouse_movements (id, item_id, item_name, branch_id, type, quantity, user_id, user_name, sale_id)
+       values ($1, $2, $3, $4, 'salida', $5, $6, $7, $8)`,
+      [movementId, delivery.itemId, item.name, branchId, delivery.quantity, user.id, user.name, saleId],
+    );
+
+    snapshot.push({ itemId: delivery.itemId, itemName: item.name, quantity: delivery.quantity });
+  }
+  return snapshot;
 }

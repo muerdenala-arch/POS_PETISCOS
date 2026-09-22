@@ -68,6 +68,20 @@ export function Ticket({ sale, onClose }: TicketProps) {
               </p>
             </div>
           ))}
+
+          {sale.warehouseDeliveries && sale.warehouseDeliveries.length > 0 && (
+            <>
+              <div className="my-2 border-t border-dashed border-ink-soft/50" />
+              <p className="mb-1 font-semibold uppercase tracking-wide text-ink-muted">Entrega de bodega</p>
+              {sale.warehouseDeliveries.map((d) => (
+                <div key={d.itemId} className="flex justify-between">
+                  <span>{d.quantity}x {d.itemName}</span>
+                  <span className="text-ink-muted">Sin cargo</span>
+                </div>
+              ))}
+            </>
+          )}
+
           <div className="my-2 border-t border-dashed border-ink-soft/50" />
           <div className="flex justify-between font-bold">
             <span>TOTAL</span>

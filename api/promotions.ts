@@ -4,9 +4,13 @@ import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js
 import { requireAuth, type AuthedRequest } from './_lib/auth.js';
 import type { Promotion } from '../src/types/index.js';
 
+// starts_at/ends_at son "date" (sin hora); se castean a texto para devolver
+// "YYYY-MM-DD" tal cual, sin que el driver los convierta a Date y corra el día por
+// zona horaria (Bolivia es UTC-4, medianoche UTC cae en el día anterior acá).
 const SELECT_COLUMNS = `
   id, name, discount_type as "discountType", discount_value as "discountValue",
   applies_to as "appliesTo", branch_ids as "branchIds", is_active as "isActive",
+  starts_at::text as "startDate", ends_at::text as "endDate",
   created_at as "createdAt"
 `;
 
@@ -31,9 +35,13 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
 
   if (req.method === 'POST' && !id) {
     const body = requireBody<Promotion>(req);
+    if (body.startDate && body.endDate && body.endDate < body.startDate) {
+      res.status(400).json({ error: 'La fecha de fin debe ser igual o posterior a la fecha de inicio.' });
+      return;
+    }
     const rows = await query<Promotion>(
-      `INSERT INTO promotions (id, name, discount_type, discount_value, applies_to, branch_ids, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO promotions (id, name, discount_type, discount_value, applies_to, branch_ids, is_active, starts_at, ends_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING ${SELECT_COLUMNS}`,
       [
         body.id,
@@ -43,6 +51,8 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
         body.appliesTo ?? 'ALL',
         JSON.stringify(body.branchIds ?? []),
         body.isActive ?? true,
+        body.startDate ?? null,
+        body.endDate ?? null,
       ]
     );
     res.status(201).json(rows[0]);
@@ -51,6 +61,10 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
 
   if (req.method === 'PATCH' && id) {
     const body = requireBody<Partial<Promotion>>(req);
+    if (body.startDate && body.endDate && body.endDate < body.startDate) {
+      res.status(400).json({ error: 'La fecha de fin debe ser igual o posterior a la fecha de inicio.' });
+      return;
+    }
     const promotion = await queryOne<Promotion>(
       `UPDATE promotions SET
          name = COALESCE($2, name),
@@ -59,6 +73,8 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
          applies_to = COALESCE($5, applies_to),
          branch_ids = COALESCE($6, branch_ids),
          is_active = COALESCE($7, is_active),
+         starts_at = COALESCE($8, starts_at),
+         ends_at = COALESCE($9, ends_at),
          updated_at = NOW()
        WHERE id = $1
        RETURNING ${SELECT_COLUMNS}`,
@@ -70,6 +86,8 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
         body.appliesTo ?? null,
         body.branchIds ? JSON.stringify(body.branchIds) : null,
         body.isActive ?? null,
+        body.startDate ?? null,
+        body.endDate ?? null,
       ]
     );
     if (!promotion) {
