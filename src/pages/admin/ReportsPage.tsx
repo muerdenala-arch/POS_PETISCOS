@@ -39,11 +39,15 @@ export default function ReportsPage() {
   
   const [viewingReceipt, setViewingReceipt] = useState<Sale | null>(null);
 
+  // Evita depender de `sales` en el efecto de abajo (que la actualiza) — solo importa
+  // si ya hubo una carga exitosa alguna vez, para no repetir el spinner en cada poll.
+  const hasLoadedOnceRef = useRef(false);
+
   useEffect(() => {
     let isMounted = true;
 
     async function fetchData() {
-      if (isMounted && sales.length === 0) { // Solo mostrar loading la primera vez o si está vacío
+      if (isMounted && !hasLoadedOnceRef.current) { // Solo mostrar loading la primera vez
         setIsLoading(true);
         setFetchError(null);
       }
@@ -79,6 +83,7 @@ export default function ReportsPage() {
         setMonthlyExpenses(data.monthlyExpenses || 0);
         setYearlyExpenses(data.yearlyExpenses || 0);
         setTotalDiscounts(data.totalDiscounts ?? 0);
+        hasLoadedOnceRef.current = true;
       } catch (err) {
         console.error('Error fetching reports:', err);
         setFetchError('No se pudo cargar el reporte. Verifica la conexión y vuelve a intentarlo.');

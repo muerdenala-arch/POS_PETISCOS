@@ -224,7 +224,7 @@ export function CheckoutModal({ open, total, onClose, onConfirm }: CheckoutModal
                     onClick={() => setLightboxOpen(true)}
                     className="relative mb-5 rounded-xl2 border-4 border-primary-200 bg-white p-5 shadow-soft dark:border-primary-400/70 cursor-pointer hover:border-primary-400 transition-colors"
                   >
-                    <img src={activeQr.image} alt={`QR de cobro — ${activeQr.alias}`} className="h-44 w-44 object-contain" />
+                    <img src={activeQr.imageUrl} alt={`QR de cobro — ${activeQr.alias}`} className="h-44 w-44 object-contain" />
                   </div>
                 </>
               ) : (
@@ -271,7 +271,7 @@ export function CheckoutModal({ open, total, onClose, onConfirm }: CheckoutModal
           >
             <p className="text-white/80 font-bold mb-4">Toca en cualquier parte para cerrar</p>
             <div className="bg-white p-6 rounded-3xl w-full max-w-md shadow-2xl flex items-center justify-center" onClick={e => e.stopPropagation()}>
-              <img src={activeQr.image} className="w-full h-auto object-contain" alt="QR en pantalla completa" />
+              <img src={activeQr.imageUrl} className="w-full h-auto object-contain" alt="QR en pantalla completa" />
             </div>
           </motion.div>
         )}

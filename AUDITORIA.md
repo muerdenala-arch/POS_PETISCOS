@@ -129,11 +129,18 @@ Se corrigió el hallazgo crítico de la sección 5. Resumen de lo que cambió:
 
 Verificado en un servidor local real (`npm run dev:local`, `.claude/launch.json` agregado para poder levantarlo desde el navegador integrado): sin cookie cualquier endpoint responde 401; un cajero de prueba pudo leer productos y crear una venta pero recibió 403 al intentar crear una sucursal o ver reportes; un admin de prueba pudo ver reportes; el login con PIN incorrecto respondió 401 con el mensaje esperado y el correcto abrió sesión y sincronizó el panel; cerrar sesión invalidó la cookie del lado del servidor. Los usuarios de prueba se crearon y borraron directamente en la base para no depender de credenciales reales del negocio. `npx tsc -b`, `npm run build` y `npm run lint` sin errores nuevos.
 
-### Pendiente de decisión (no aplicado)
+## Segunda ronda de correcciones (2026-09-22)
 
-1. Validación server-side de los montos de venta contra precios reales (sección 2), para que no dependa de confiar en el cliente.
-2. Restricciones `CHECK` de no-negatividad y de enum en `schema.sql` (sección 6).
-3. Unificar nombres (`cash_register_id`/`register_session_id`, `image`/`imageUrl`) (sección 7).
-4. Evaluar `npm audit fix --force` sobre `vercel` (CLI de desarrollo) en una ventana aparte, probando el flujo de deploy antes de aceptarlo.
-5. Eliminar `server.mjs` si `server.ts` es el único servidor local en uso real.
-6. **Acción manual pendiente:** agregar `SESSION_SECRET` en las variables de entorno de Vercel antes de desplegar estos cambios a producción.
+Se resolvió el resto de la lista pendiente:
+
+- **Validación server-side de montos de venta (`api/_lib/pricing.ts`, nuevo).** `POST /api/sales` ya no confía en `subtotal`/`discountAmount`/`total` del cliente: recalcula cada ítem desde el catálogo real (producto, tamaño, topping, promoción vigente — misma fórmula que `cartStore.ts`/`promotionStore.ts`, portada al servidor) y el descuento del cupón (misma fórmula que `couponStore.ts`, pero usando la categoría real del producto en la base, no la que declare el cliente, para que no se pueda falsear la categoría y colar un producto en un cupón que no le corresponde). Si el total recalculado no coincide con el enviado (tolerancia de 0,01 Bs por redondeo), la venta se rechaza. Probado con curl contra datos reales: venta legítima aceptada; producto con precio falseado rechazado; producto inexistente rechazado; total negativo rechazado; el reintento idempotente (offline) sigue devolviendo 409 con la venta ya guardada, sin verse afectado.
+- **Sesiones ahora se revalidan contra la base en cada request (`api/_lib/auth.ts`).** La cookie firmada por sí sola dura 12h; antes de esto, bloquear/eliminar a alguien (o cambiarle el rol) no tenía efecto hasta que la cookie expirara. Ahora cada request confirma que el usuario sigue existiendo y activo, y usa su rol *actual* de la base, no el que tenía al momento del login. Probado: sesión de un usuario bloqueado a mitad de uso pasa a responder 401 en la siguiente request.
+- **Restricciones `CHECK`** agregadas a `schema.sql` (montos no negativos en `sales`, `expenses`, `products`, `toppings`, `register_sessions`; enums válidos para `discount_type` en `sales`/`promotions`/`coupons`). Aplicadas contra la base real; se verificó primero que no había datos existentes que las violaran, y que el archivo sigue siendo seguro de re-ejecutar.
+- **Nombres unificados:** `expenses.cash_register_id` → `register_session_id` (igual que en `sales`; migrado con `ALTER TABLE RENAME COLUMN` idempotente) y `QrCode.image` → `imageUrl` (igual que `Product.imageUrl`), actualizados en la API, el tipo y los 4 componentes que lo usaban.
+- **`server.mjs` eliminado** (duplicado desactualizado de `server.ts`, no referenciado por ningún script).
+- **Code-splitting del panel de admin:** las 9 páginas de `/admin/*` ahora se cargan con `React.lazy()` en vez de ir en el bundle principal. El chunk inicial bajó de 518 KB a 407 KB (gzip: 150 KB → 127 KB), y ya no dispara el warning de Vite por tamaño.
+- **2 warnings de ESLint corregidos** (`CashAuditPage.tsx`, `ReportsPage.tsx`) sin cambiar el comportamiento (se evitó agregar `sales` a un `useEffect` que la actualiza, lo que hubiera creado un loop de refetch).
+
+No se tocó, a propósito: `npm audit fix --force` sobre la CLI de `vercel` (herramienta de desarrollo, no código de producción) — instala `vercel@54` con cambios incompatibles; requeriría probar el flujo de deploy aparte antes de aceptarlo.
+
+Verificado después de todo lo anterior: `npx tsc -b`, `npm run build` y `npm run lint` sin errores ni warnings.

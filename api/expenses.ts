@@ -6,7 +6,7 @@ import type { Expense } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
   id, amount, concept, category,
-  cash_register_id as "cashRegisterId",
+  register_session_id as "registerSessionId",
   branch_id as "branchId",
   user_id as "userId",
   created_at as "createdAt"
@@ -41,10 +41,10 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
     }
 
     const rows = await query<Expense>(
-      `INSERT INTO expenses (id, amount, concept, category, cash_register_id, branch_id, user_id, created_at)
+      `INSERT INTO expenses (id, amount, concept, category, register_session_id, branch_id, user_id, created_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING ${SELECT_COLUMNS}`,
-      [body.id, body.amount, body.concept, body.category, body.cashRegisterId || null, body.branchId || null, body.userId, body.createdAt || new Date().toISOString()]
+      [body.id, body.amount, body.concept, body.category, body.registerSessionId || null, body.branchId || null, body.userId, body.createdAt || new Date().toISOString()]
     );
 
     res.status(201).json(rows[0]);

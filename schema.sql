@@ -129,17 +129,29 @@ CREATE TABLE IF NOT EXISTS expenses (
   amount              numeric(10, 2) NOT NULL,
   concept             text NOT NULL,
   category            text NOT NULL,
-  cash_register_id    text REFERENCES register_sessions (id),
+  register_session_id text REFERENCES register_sessions (id),
   branch_id           text REFERENCES branches (id),
   user_id             text NOT NULL REFERENCES staff (id),
   created_at          timestamptz NOT NULL DEFAULT now()
 );
 
+-- Nombre original de la columna de arriba: `cash_register_id`. Se renombró para que
+-- coincida con `sales.register_session_id` (mismo concepto, mismo nombre en toda la
+-- base). Este bloque solo actúa si una base ya existente todavía tiene el nombre viejo.
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'expenses' AND column_name = 'cash_register_id'
+  ) THEN
+    ALTER TABLE expenses RENAME COLUMN cash_register_id TO register_session_id;
+  END IF;
+END $$;
+
 -- ── Indices para consultas frecuentes ────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_sales_branch ON sales (branch_id);
 CREATE INDEX IF NOT EXISTS idx_sales_session ON sales (register_session_id);
 CREATE INDEX IF NOT EXISTS idx_sales_created_at ON sales (created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_expenses_session ON expenses (cash_register_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_session ON expenses (register_session_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_branch ON expenses (branch_id);
 CREATE INDEX IF NOT EXISTS idx_register_sessions_branch ON register_sessions (branch_id);
 CREATE INDEX IF NOT EXISTS idx_register_sessions_status ON register_sessions (status);
@@ -174,3 +186,65 @@ CREATE TABLE IF NOT EXISTS coupons (
   created_at     timestamptz NOT NULL DEFAULT now(),
   updated_at     timestamptz NOT NULL DEFAULT now()
 );
+
+-- ── Restricciones de integridad agregadas después del lanzamiento ─────────────
+-- `ALTER TABLE ADD CONSTRAINT` no soporta `IF NOT EXISTS`, así que cada una va en un
+-- bloque DO que ignora el error si ya existe — mantiene este archivo seguro de
+-- volver a correr, igual que el resto del esquema.
+DO $$ BEGIN
+  ALTER TABLE toppings ADD CONSTRAINT toppings_non_negative
+    CHECK (price_extra >= 0 AND low_stock_threshold >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE products ADD CONSTRAINT products_non_negative
+    CHECK (base_price >= 0 AND low_stock_threshold >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE register_sessions ADD CONSTRAINT register_sessions_non_negative
+    CHECK (
+      opening_amount >= 0
+      AND (closing_amount_counted IS NULL OR closing_amount_counted >= 0)
+      AND (expected_amount IS NULL OR expected_amount >= 0)
+      AND (sales_total IS NULL OR sales_total >= 0)
+      AND (sales_count IS NULL OR sales_count >= 0)
+      AND (cash_sales_total IS NULL OR cash_sales_total >= 0)
+      AND (qr_sales_total IS NULL OR qr_sales_total >= 0)
+    );
+  -- `difference` (contado - esperado) puede ser negativo a propósito: es un faltante de caja.
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE sales ADD CONSTRAINT sales_non_negative
+    CHECK (subtotal >= 0 AND subtotal_before_discount >= 0 AND discount_amount >= 0 AND total >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE sales ADD CONSTRAINT sales_discount_type_valid
+    CHECK (discount_type IN ('NONE', 'PROMO', 'COUPON', 'BOTH'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE expenses ADD CONSTRAINT expenses_amount_positive CHECK (amount > 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE promotions ADD CONSTRAINT promotions_discount_type_valid
+    CHECK (discount_type IN ('PERCENTAGE', 'FIXED_AMOUNT'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE promotions ADD CONSTRAINT promotions_discount_value_non_negative
+    CHECK (discount_value >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE coupons ADD CONSTRAINT coupons_discount_type_valid
+    CHECK (discount_type IN ('PERCENTAGE', 'FIXED_AMOUNT', 'FREE_ITEM'));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  ALTER TABLE coupons ADD CONSTRAINT coupons_non_negative
+    CHECK (discount_value >= 0 AND max_uses > 0 AND used_count >= 0);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

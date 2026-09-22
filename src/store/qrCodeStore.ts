@@ -7,7 +7,7 @@ import { uid } from '@/lib/utils';
 export interface QrCodeFormData {
   alias: string;
   bankOrHolder: string;
-  image: string;
+  imageUrl: string;
   branchId: string;
 }
 

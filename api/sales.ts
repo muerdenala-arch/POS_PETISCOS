@@ -2,6 +2,7 @@ import type { VercelResponse } from '@vercel/node';
 import { query, withTransaction } from './_lib/db.js';
 import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
 import { requireAuth, type AuthedRequest } from './_lib/auth.js';
+import { amountsMatch, computeCouponDiscount, recomputeItemPricing } from './_lib/pricing.js';
 import type { Sale, CashRegisterSession } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
@@ -147,21 +148,61 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
         return null;
       }
 
+      // Recalcula precios, tamaños, toppings y promoción vigente desde el catálogo
+      // real de la base — nunca se confía en los precios que manda el cliente, para
+      // que una API modificada (o una llamada directa) no pueda registrar una venta
+      // con un total distinto al que corresponde de verdad.
+      const { items: recomputedItems, subtotal, subtotalBeforeDiscount, categoryOf } =
+        await recomputeItemPricing(body.items, body.branchId);
+
       // Quemar el cupón atómicamente si fue utilizado en esta venta
+      let discountAmount = 0;
       if (body.couponCode) {
-        const coupons = await tx<{ id: string; used_count: number; max_uses: number }>(
-          `SELECT id, used_count, max_uses FROM coupons WHERE UPPER(code) = UPPER($1) AND is_active = true FOR UPDATE`,
+        const coupons = await tx<{
+          id: string;
+          used_count: number;
+          max_uses: number;
+          discount_type: string;
+          discount_value: number;
+          applies_to: string;
+        }>(
+          `SELECT id, used_count, max_uses, discount_type, discount_value, applies_to
+           FROM coupons WHERE UPPER(code) = UPPER($1) AND is_active = true FOR UPDATE`,
           [body.couponCode]
         );
         const coupon = coupons[0];
         if (!coupon) {
           throw new Error('Cupón inválido o ya agotado.');
         }
+        discountAmount = computeCouponDiscount(
+          { discountType: coupon.discount_type, discountValue: Number(coupon.discount_value), appliesTo: coupon.applies_to },
+          recomputedItems,
+          categoryOf,
+        );
         const newCount = coupon.used_count + 1;
         const willBeExhausted = newCount >= coupon.max_uses;
         await tx(
           `UPDATE coupons SET used_count = $2, is_active = $3, updated_at = NOW() WHERE id = $1`,
           [coupon.id, newCount, !willBeExhausted]
+        );
+      }
+
+      const total = Math.max(0, subtotal - discountAmount);
+      const hasPromo = recomputedItems.some((i) => i.appliedPromotionId);
+      const hasCoupon = !!body.couponCode;
+      const discountType = hasPromo && hasCoupon ? 'BOTH' : hasPromo ? 'PROMO' : hasCoupon ? 'COUPON' : 'NONE';
+
+      // Si lo recalculado no coincide con lo que mandó el cajero (precio cambió entre
+      // que armó el carrito y confirmó el pago, o el body fue alterado), se rechaza en
+      // vez de registrar un monto que no es el real.
+      if (
+        !amountsMatch(subtotal, Number(body.subtotal)) ||
+        !amountsMatch(subtotalBeforeDiscount, Number(body.subtotalBeforeDiscount ?? body.subtotal)) ||
+        !amountsMatch(discountAmount, Number(body.discountAmount ?? 0)) ||
+        !amountsMatch(total, Number(body.total))
+      ) {
+        throw new Error(
+          'Los montos de la venta no coinciden con los precios actuales del catálogo. Actualiza la página e intenta de nuevo.',
         );
       }
 
@@ -174,13 +215,13 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
          RETURNING ${SELECT_COLUMNS}`,
         [
           body.id,
-          JSON.stringify(body.items),
-          body.subtotal,
-          body.subtotalBeforeDiscount ?? body.subtotal,
-          body.discountAmount ?? 0,
-          body.discountType ?? 'NONE',
+          JSON.stringify(recomputedItems),
+          subtotal,
+          subtotalBeforeDiscount,
+          discountAmount,
+          discountType,
           body.couponCode ?? null,
-          body.total,
+          total,
           JSON.stringify(body.payment),
           body.cashierId,
           body.cashierName,

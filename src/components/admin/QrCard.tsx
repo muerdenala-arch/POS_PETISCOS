@@ -30,7 +30,7 @@ export function QrCard({ qr, branchName, onActivate, onEdit, onDelete }: QrCardP
         )}
 
         <div className="flex items-center justify-center bg-white p-4 dark:bg-zinc-100">
-          <img src={qr.image} alt={qr.alias} className="h-32 w-32 object-contain" />
+          <img src={qr.imageUrl} alt={qr.alias} className="h-32 w-32 object-contain" />
         </div>
 
         <div className="flex flex-1 flex-col gap-2 p-4">

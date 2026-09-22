@@ -32,7 +32,7 @@ export default function CashClosePage() {
   );
 
   const sessionExpenses = useMemo(
-    () => activeSession ? expenses.filter(e => e.cashRegisterId === activeSession.id) : [],
+    () => activeSession ? expenses.filter(e => e.registerSessionId === activeSession.id) : [],
     [activeSession, expenses]
   );
 

@@ -5,7 +5,7 @@ import { requireAuth, type AuthedRequest } from './_lib/auth.js';
 import type { QrCode } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
-  id, alias, bank_or_holder as "bankOrHolder", image_url as "image", active,
+  id, alias, bank_or_holder as "bankOrHolder", image_url as "imageUrl", active,
   branch_id as "branchId", created_at as "createdAt"
 `;
 
@@ -42,7 +42,7 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
          alias = excluded.alias, bank_or_holder = excluded.bank_or_holder,
          image_url = excluded.image_url, branch_id = excluded.branch_id
        returning ${SELECT_COLUMNS}`,
-      [body.id, body.alias, body.bankOrHolder ?? '', body.image, active, body.branchId],
+      [body.id, body.alias, body.bankOrHolder ?? '', body.imageUrl, active, body.branchId],
     );
     res.status(201).json(rows[0]);
     return;
@@ -80,7 +80,7 @@ async function handler(req: AuthedRequest, res: VercelResponse) {
          branch_id = coalesce($5, branch_id)
        where id = $1
        returning ${SELECT_COLUMNS}`,
-      [id, body.alias ?? null, body.bankOrHolder ?? null, body.image ?? null, body.branchId ?? null],
+      [id, body.alias ?? null, body.bankOrHolder ?? null, body.imageUrl ?? null, body.branchId ?? null],
     );
     if (!qr) {
       res.status(404).json({ error: 'QR no encontrado' });

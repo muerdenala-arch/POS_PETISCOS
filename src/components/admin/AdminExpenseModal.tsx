@@ -48,7 +48,7 @@ export function AdminExpenseModal({ onClose }: AdminExpenseModalProps) {
         amount: numAmount,
         concept: concept.trim(),
         category,
-        cashRegisterId: null,
+        registerSessionId: null,
         branchId: branchId === 'all' ? null : branchId,
         userId: currentUser.id,
         createdAt: new Date().toISOString(),

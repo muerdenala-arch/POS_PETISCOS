@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { RequireAuth } from '@/router/RequireAuth';
 import { useAuthStore } from '@/store/authStore';
@@ -10,15 +10,19 @@ import LoginPage from '@/pages/LoginPage';
 import POSPage from '@/pages/POSPage';
 import CashOpenPage from '@/pages/CashOpenPage';
 import CashClosePage from '@/pages/CashClosePage';
-import CatalogPage from '@/pages/admin/CatalogPage';
-import InventoryPage from '@/pages/admin/InventoryPage';
-import CashAuditPage from '@/pages/admin/CashAuditPage';
-import ReportsPage from '@/pages/admin/ReportsPage';
-import StaffPage from '@/pages/admin/StaffPage';
-import QrConfigPage from '@/pages/admin/QrConfigPage';
-import BranchesPage from '@/pages/admin/BranchesPage';
-import PromotionsPage from '@/pages/admin/PromotionsPage';
-import ExpensesPage from '@/pages/admin/ExpensesPage';
+
+// El panel de admin no lo usa un cajero en su turno normal — separarlo del bundle
+// principal evita que su peso (gráficos, formularios, etc.) retrase la carga inicial
+// del flujo de venta, que es el que se usa todo el día.
+const CatalogPage = lazy(() => import('@/pages/admin/CatalogPage'));
+const InventoryPage = lazy(() => import('@/pages/admin/InventoryPage'));
+const CashAuditPage = lazy(() => import('@/pages/admin/CashAuditPage'));
+const ReportsPage = lazy(() => import('@/pages/admin/ReportsPage'));
+const StaffPage = lazy(() => import('@/pages/admin/StaffPage'));
+const QrConfigPage = lazy(() => import('@/pages/admin/QrConfigPage'));
+const BranchesPage = lazy(() => import('@/pages/admin/BranchesPage'));
+const PromotionsPage = lazy(() => import('@/pages/admin/PromotionsPage'));
+const ExpensesPage = lazy(() => import('@/pages/admin/ExpensesPage'));
 
 // Si a los 10s la primera sincronización con Neon todavía no terminó (DB caída, env var
 // faltante, función colgada), dejamos de mostrar el spinner infinito y ofrecemos
@@ -54,7 +58,8 @@ export default function App() {
   }
 
   return (
-    <Routes>
+    <Suspense fallback={<LoadingScreen timedOut={false} onRetry={() => window.location.reload()} />}>
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
 
       <Route
@@ -162,6 +167,7 @@ export default function App() {
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+      </Routes>
+    </Suspense>
   );
 }

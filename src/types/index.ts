@@ -164,7 +164,7 @@ export interface QrCode {
   id: string;
   alias: string; // ej. "Yape", "Cuenta Principal"
   bankOrHolder: string; // ej. "BMSC", "Banco Unión — Titular Valeria Ríos"
-  image: string; // data URL (base64)
+  imageUrl: string; // URL pública en Cloudinary (o data URL si Cloudinary no está configurado)
   active: boolean;
   branchId: string;
   createdAt: string; // ISO
@@ -196,7 +196,7 @@ export interface Expense {
   amount: number;
   concept: string;
   category: string;
-  cashRegisterId?: string | null;
+  registerSessionId?: string | null;
   branchId?: string | null;
   userId: string;
   createdAt: string;

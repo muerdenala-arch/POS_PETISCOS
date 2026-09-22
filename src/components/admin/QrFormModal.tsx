@@ -18,7 +18,7 @@ interface QrFormModalProps {
 }
 
 function emptyForm(branchId: string) {
-  return { alias: '', bankOrHolder: '', image: '', branchId };
+  return { alias: '', bankOrHolder: '', imageUrl: '', branchId };
 }
 
 export function QrFormModal({ qr, open, defaultBranchId, onClose }: QrFormModalProps) {
@@ -32,7 +32,7 @@ export function QrFormModal({ qr, open, defaultBranchId, onClose }: QrFormModalP
 
   useEffect(() => {
     if (qr) {
-      setForm({ alias: qr.alias, bankOrHolder: qr.bankOrHolder, image: qr.image, branchId: qr.branchId });
+      setForm({ alias: qr.alias, bankOrHolder: qr.bankOrHolder, imageUrl: qr.imageUrl, branchId: qr.branchId });
     } else {
       setForm(emptyForm(defaultBranchId));
     }
@@ -48,10 +48,10 @@ export function QrFormModal({ qr, open, defaultBranchId, onClose }: QrFormModalP
     try {
       // Más calidad que el comprobante de venta: este QR se escanea, debe verse nítido.
       const dataUrl = await fileToCompressedDataUrl(file, { maxWidth: 640, quality: 0.9 });
-      // Sube a Cloudinary de una vez — así lo que queda en `form.image` (y termina en la
-      // base de datos) es la URL pública, visible desde cualquier dispositivo.
+      // Sube a Cloudinary de una vez — así lo que queda en `form.imageUrl` (y termina en
+      // la base de datos) es la URL pública, visible desde cualquier dispositivo.
       const { url } = await api.upload.image(dataUrl, 'qr-codes');
-      setForm((f) => ({ ...f, image: url }));
+      setForm((f) => ({ ...f, imageUrl: url }));
     } catch {
       setError('No se pudo cargar la imagen. Intenta de nuevo.');
     } finally {
@@ -61,14 +61,14 @@ export function QrFormModal({ qr, open, defaultBranchId, onClose }: QrFormModalP
 
   function handleSave() {
     if (uploading) return;
-    if (!form.alias.trim() || !form.image) {
+    if (!form.alias.trim() || !form.imageUrl) {
       setError('Falta el alias o la imagen del QR.');
       return;
     }
     const data = {
       alias: form.alias.trim(),
       bankOrHolder: form.bankOrHolder.trim(),
-      image: form.image,
+      imageUrl: form.imageUrl,
       branchId: form.branchId,
     };
     if (qr) {
@@ -90,13 +90,13 @@ export function QrFormModal({ qr, open, defaultBranchId, onClose }: QrFormModalP
               <Upload size={24} className="animate-pulse text-primary-500" />
               <span className="font-display text-sm font-bold text-ink">Subiendo imagen…</span>
             </div>
-          ) : form.image ? (
+          ) : form.imageUrl ? (
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="group relative mx-auto flex h-40 w-40 items-center justify-center overflow-hidden rounded-xl2 border-2 border-secondary-300 bg-white cursor-pointer dark:border-secondary-600"
             >
-              <img src={form.image} alt="QR" className="h-full w-full object-contain" />
+              <img src={form.imageUrl} alt="QR" className="h-full w-full object-contain" />
               <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-bold text-white opacity-0 transition-opacity group-hover:opacity-100">
                 Cambiar imagen
               </span>

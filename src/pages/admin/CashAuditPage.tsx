@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShieldCheck } from 'lucide-react';
 import { AdminShell } from '@/components/layout/AdminShell';
@@ -21,10 +21,13 @@ export default function CashAuditPage() {
 
   const allStaff = useStaffStore((s) => s.users || []);
 
-  const getCashierName = (id: string, fallback: string) => {
-    const s = allStaff.find(st => st.id === id);
-    return s ? s.name : fallback;
-  };
+  const getCashierName = useCallback(
+    (id: string, fallback: string) => {
+      const s = allStaff.find(st => st.id === id);
+      return s ? s.name : fallback;
+    },
+    [allStaff],
+  );
 
   const cashiers = useMemo(() => {
     const map = new Map<string, string>();
@@ -32,7 +35,7 @@ export default function CashAuditPage() {
       map.set(s.cashierId, getCashierName(s.cashierId, s.cashierName));
     }
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
-  }, [allSessions, allStaff]);
+  }, [allSessions, getCashierName]);
 
   const sessions = useMemo(() => {
     return allSessions.filter((s) => {

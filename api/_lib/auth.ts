@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import bcrypt from 'bcryptjs';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { queryOne } from './db.js';
 import type { Role } from '../../src/types/index.js';
 
 const COOKIE_NAME = 'pos_session';
@@ -97,7 +98,13 @@ type AuthedHandler = (req: AuthedRequest, res: VercelResponse) => Promise<void> 
 
 /** Exige una sesión válida antes de ejecutar el handler; agrega `req.user` con los
  *  datos de la sesión. No filtra por rol acá — cada endpoint decide, método por
- *  método, qué acciones requieren rol 'admin' (ver comentarios en cada archivo). */
+ *  método, qué acciones requieren rol 'admin' (ver comentarios en cada archivo).
+ *
+ *  La cookie es válida por su firma sola durante 12h, así que además revalida contra
+ *  la base en cada request: si a alguien lo bloquean, lo eliminan, o le cambian el rol
+ *  mientras tiene una sesión abierta, el cambio se aplica de inmediato (no hay que
+ *  esperar a que la cookie expire). Usa siempre el rol y el nombre ACTUALES de la
+ *  base, nunca los que traía la cookie firmada, por si cambiaron después del login. */
 export function requireAuth(handler: AuthedHandler) {
   return async (req: VercelRequest, res: VercelResponse) => {
     const session = getSession(req);
@@ -105,6 +112,16 @@ export function requireAuth(handler: AuthedHandler) {
       res.status(401).json({ error: 'No autenticado. Inicia sesión nuevamente.' });
       return;
     }
-    await handler(Object.assign(req, { user: session }), res);
+
+    const current = await queryOne<{ name: string; role: Role; status: string }>(
+      `select name, role, status from staff where id = $1`,
+      [session.id],
+    );
+    if (!current || current.status !== 'activo') {
+      res.status(401).json({ error: 'Tu sesión ya no es válida. Inicia sesión nuevamente.' });
+      return;
+    }
+
+    await handler(Object.assign(req, { user: { id: session.id, name: current.name, role: current.role } }), res);
   };
 }

@@ -41,7 +41,7 @@ export function ExpenseModal({ isOpen, onClose }: ExpenseModalProps) {
         amount: numAmount,
         concept: concept.trim(),
         category,
-        cashRegisterId: activeSession.id,
+        registerSessionId: activeSession.id,
         branchId: currentBranchId,
         userId: currentUser.id,
       });
