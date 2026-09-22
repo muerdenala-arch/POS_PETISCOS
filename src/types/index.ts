@@ -15,7 +15,9 @@ export type StaffStatus = 'activo' | 'bloqueado';
 export interface User {
   id: string;
   name: string;
-  pin: string; // PIN de 4 dígitos para login táctil
+  /** Solo se envía al servidor al crear/restablecer (4 dígitos); el servidor nunca
+   *  lo devuelve — un User leído de la API siempre lo trae vacío/ausente. */
+  pin?: string;
   role: Role;
   color: string; // clase tailwind para el avatar (fondo del círculo)
   status: StaffStatus; // 'bloqueado' no puede iniciar sesión ni aparece en el login

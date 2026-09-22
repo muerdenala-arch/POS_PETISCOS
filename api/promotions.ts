@@ -1,6 +1,7 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelResponse } from '@vercel/node';
 import { query, queryOne } from './_lib/db.js';
 import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
+import { requireAuth, type AuthedRequest } from './_lib/auth.js';
 import type { Promotion } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
@@ -9,7 +10,7 @@ const SELECT_COLUMNS = `
   created_at as "createdAt"
 `;
 
-async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: AuthedRequest, res: VercelResponse) {
   const id = typeof req.query.id === 'string' ? req.query.id : undefined;
 
   if (req.method === 'GET' && !id) {
@@ -19,6 +20,12 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       `SELECT ${SELECT_COLUMNS} FROM promotions ${where} ORDER BY created_at DESC`
     );
     res.status(200).json(promotions);
+    return;
+  }
+
+  // Crear, editar o eliminar promociones es exclusivo de un administrador.
+  if (req.method !== 'GET' && req.user.role !== 'admin') {
+    res.status(403).json({ error: 'Solo un administrador puede gestionar promociones.' });
     return;
   }
 
@@ -82,4 +89,4 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   methodNotAllowed(res, ['GET', 'POST', 'PATCH', 'DELETE']);
 }
 
-export default withErrorHandling(handler);
+export default withErrorHandling(requireAuth(handler));

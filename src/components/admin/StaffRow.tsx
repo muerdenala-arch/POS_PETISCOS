@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Eye, EyeOff, KeyRound, Lock, MapPin, Pencil, ShieldCheck, Trash2, Unlock, Wallet } from 'lucide-react';
+import { KeyRound, Lock, MapPin, Pencil, ShieldCheck, Trash2, Unlock, Wallet } from 'lucide-react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { useRegisterStore } from '@/store/registerStore';
@@ -17,7 +16,6 @@ interface StaffRowProps {
 }
 
 export function StaffRow({ user, onEdit, onToggleBlocked, onResetPin, onDelete }: StaffRowProps) {
-  const [pinVisible, setPinVisible] = useState(false);
   const hasActiveSession = useRegisterStore((s) =>
     s.sessions.some((sess) => sess.cashierId === user.id && sess.status === 'abierta'),
   );
@@ -76,15 +74,6 @@ export function StaffRow({ user, onEdit, onToggleBlocked, onResetPin, onDelete }
       </div>
 
       <div className="flex items-center justify-between gap-4 sm:justify-end">
-        <button
-          onClick={() => setPinVisible((v) => !v)}
-          className="flex items-center gap-1.5 rounded-lg bg-cream-200 px-2.5 py-1.5 font-mono text-sm font-bold text-ink-muted transition-colors hover:bg-cream-300 cursor-pointer"
-          aria-label={pinVisible ? 'Ocultar PIN' : 'Mostrar PIN'}
-        >
-          {pinVisible ? user.pin : '••••'}
-          {pinVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-        </button>
-
         <div className="flex items-center gap-1.5">
           <ActionButton
             label={blocked ? 'Activar acceso' : 'Bloquear acceso'}

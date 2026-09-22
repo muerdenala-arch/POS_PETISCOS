@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuthStore } from '@/store/authStore';
-import { useStaffStore } from '@/store/staffStore';
 import { useBranchStore } from '@/store/branchStore';
 import { NumericKeypad } from '@/components/ui/NumericKeypad';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
@@ -20,7 +19,6 @@ export default function LoginPage() {
   const currentBranchId = useAuthStore((s) => s.currentBranchId);
   const setCurrentBranch = useAuthStore((s) => s.setCurrentBranch);
   const allBranches = useBranchStore((s) => s.branches);
-  const allUsers = useStaffStore((s) => s.users);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -47,14 +45,12 @@ export default function LoginPage() {
     if (next.length === 4) {
       // Pequeña pausa para que el último punto se vea antes de autenticar.
       setTimeout(() => {
-        const ok = loginWithPin(next);
-        if (!ok) setPin('');
+        loginWithPin(next).then((ok) => {
+          if (!ok) setPin('');
+        });
       }, 140);
     }
   }
-
-  // Previene que el login quede inaccesible si no hay usuarios en la DB todavía.
-  const hasUsers = allUsers.some((u) => u.status === 'activo');
 
   return (
     <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-gradient-to-br from-primary-50 via-cream to-secondary-50 px-4 py-8 dark:from-primary-900/20 dark:to-secondary-900/20">
@@ -104,12 +100,6 @@ export default function LoginPage() {
           />
         ) : (
           <>
-            {!hasUsers && (
-              <p className="mb-5 rounded-lg bg-red-50 px-4 py-3 text-center text-sm font-semibold text-red-600 dark:bg-red-900/20">
-                No hay usuarios activos. Contacta al administrador.
-              </p>
-            )}
-
             {/* Título + indicadores de PIN */}
             <div className="mb-5 flex flex-col items-center gap-3">
               <p className="text-sm font-semibold text-ink-muted tracking-wide">

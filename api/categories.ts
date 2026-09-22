@@ -1,16 +1,23 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelResponse } from '@vercel/node';
 import { query, queryOne } from './_lib/db.js';
-import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
+import { isUniqueViolation, methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
+import { requireAuth, type AuthedRequest } from './_lib/auth.js';
 import type { Category } from '../src/types/index.js';
 
 const SELECT_COLUMNS = 'id, name, active';
 
-async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: AuthedRequest, res: VercelResponse) {
   const id = typeof req.query.id === 'string' ? req.query.id : undefined;
 
   if (req.method === 'GET' && !id) {
     const categories = await query<Category>(`select ${SELECT_COLUMNS} from categories order by name asc`);
     res.status(200).json(categories);
+    return;
+  }
+
+  // Crear o eliminar categorías es exclusivo de un administrador.
+  if (req.method !== 'GET' && req.user.role !== 'admin') {
+    res.status(403).json({ error: 'Solo un administrador puede gestionar categorías.' });
     return;
   }
 
@@ -31,31 +38,26 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       );
       res.status(201).json(rows[0]);
     } catch (err) {
-      const dbError = err as { code?: string };
-      if (dbError.code === '23505') { // unique violation
+      if (isUniqueViolation(err)) {
         res.status(409).json({ error: 'La categoría ya existe' });
-      } else {
-        throw err;
+        return;
       }
+      throw err;
     }
     return;
   }
 
   if (req.method === 'DELETE' && id) {
-    try {
-      const cat = await queryOne<Category>('select name from categories where id = $1', [id]);
-      if (cat) {
-        await query('delete from products where category = $1', [cat.name]);
-      }
-      await query('delete from categories where id = $1', [id]);
-      res.status(204).end();
-    } catch (err) {
-      res.status(500).json({ error: 'Error deleting category', details: err });
+    const cat = await queryOne<Category>('select name from categories where id = $1', [id]);
+    if (cat) {
+      await query('delete from products where category = $1', [cat.name]);
     }
+    await query('delete from categories where id = $1', [id]);
+    res.status(204).end();
     return;
   }
 
   methodNotAllowed(res, ['GET', 'POST', 'DELETE']);
 }
 
-export default withErrorHandling(handler);
+export default withErrorHandling(requireAuth(handler));

@@ -30,23 +30,26 @@ const SYNC_TIMEOUT_MS = 10000;
 export default function App() {
   const currentUser = useAuthStore((s) => s.currentUser);
   useThemeEffect();
-  useDataSync();
+  // Todos los recursos de /api ahora requieren sesión (ver api/_lib/auth.ts) — recién
+  // se sincronizan una vez logueado, para no disparar 401 en cadena antes del login
+  // y para que /login pueda renderizar sin esperar ningún dato.
+  useDataSync(!!currentUser);
   useAutoLogout();
   const dataReady = useIsDataHydrated();
   const [syncTimedOut, setSyncTimedOut] = useState(false);
 
   useEffect(() => {
-    if (dataReady) {
+    if (!currentUser || dataReady) {
       setSyncTimedOut(false);
       return;
     }
     const id = setTimeout(() => setSyncTimedOut(true), SYNC_TIMEOUT_MS);
     return () => clearTimeout(id);
-  }, [dataReady]);
+  }, [currentUser, dataReady]);
 
-  // Después del primer fetch exitoso, el polling en segundo plano se sigue actualizando
-  // sin volver a mostrar esta pantalla — solo bloquea el primer render.
-  if (!dataReady) {
+  // Solo bloquea el primer render con el spinner cuando YA hay sesión y falta
+  // sincronizar; /login no depende de ningún dato del servidor.
+  if (currentUser && !dataReady) {
     return <LoadingScreen timedOut={syncTimedOut} onRetry={() => window.location.reload()} />;
   }
 

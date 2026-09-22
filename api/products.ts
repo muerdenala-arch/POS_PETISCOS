@@ -1,6 +1,7 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelResponse } from '@vercel/node';
 import { query, queryOne } from './_lib/db.js';
 import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
+import { requireAuth, type AuthedRequest } from './_lib/auth.js';
 import type { Product } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
@@ -9,12 +10,18 @@ const SELECT_COLUMNS = `
   low_stock_threshold as "lowStockThreshold", unit
 `;
 
-async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: AuthedRequest, res: VercelResponse) {
   const id = typeof req.query.id === 'string' ? req.query.id : undefined;
 
   if (req.method === 'GET' && !id) {
     const products = await query<Product>(`select ${SELECT_COLUMNS} from products order by name asc`);
     res.status(200).json(products);
+    return;
+  }
+
+  // Crear, editar o eliminar productos es exclusivo de un administrador.
+  if (req.method !== 'GET' && req.user.role !== 'admin') {
+    res.status(403).json({ error: 'Solo un administrador puede gestionar el catálogo.' });
     return;
   }
 
@@ -112,4 +119,4 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   methodNotAllowed(res, ['GET', 'POST', 'PATCH', 'DELETE']);
 }
 
-export default withErrorHandling(handler);
+export default withErrorHandling(requireAuth(handler));

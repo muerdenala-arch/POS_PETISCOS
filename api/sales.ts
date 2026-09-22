@@ -1,6 +1,7 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelResponse } from '@vercel/node';
 import { query, withTransaction } from './_lib/db.js';
 import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
+import { requireAuth, type AuthedRequest } from './_lib/auth.js';
 import type { Sale, CashRegisterSession } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
@@ -13,11 +14,17 @@ const SELECT_COLUMNS = `
   register_session_id as "registerSessionId", branch_id as "branchId", created_at as "createdAt"
 `;
 
-async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: AuthedRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const { action, startDate, endDate, branchId } = req.query;
 
     if (action === 'reports') {
+      // Los reportes financieros consolidados (todas las sucursales, todos los
+      // cajeros) son solo para administradores.
+      if (req.user.role !== 'admin') {
+        res.status(403).json({ error: 'Solo un administrador puede ver los reportes.' });
+        return;
+      }
       if (!startDate || !endDate) {
         res.status(400).json({ error: 'startDate and endDate are required' });
         return;
@@ -191,4 +198,4 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   methodNotAllowed(res, ['GET', 'POST']);
 }
 
-export default withErrorHandling(handler);
+export default withErrorHandling(requireAuth(handler));

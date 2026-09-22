@@ -11,8 +11,12 @@ import { useCouponStore } from '@/store/couponStore';
 
 const POLL_INTERVAL_MS = 60000;
 
-export function useDataSync() {
+/** `enabled` debe ser `false` hasta que haya una sesión iniciada: todos estos endpoints
+ *  ahora requieren autenticación (ver api/_lib/auth.ts), así que sincronizar antes de
+ *  loguearse solo generaría 401 en cadena y nunca marcaría `hydrated`. */
+export function useDataSync(enabled: boolean) {
   useEffect(() => {
+    if (!enabled) return;
     let isInitial = true;
     const fetchAll = () => {
       if (isInitial) {
@@ -64,7 +68,7 @@ export function useDataSync() {
       stop();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [enabled]);
 }
 
 export function useIsDataHydrated(): boolean {

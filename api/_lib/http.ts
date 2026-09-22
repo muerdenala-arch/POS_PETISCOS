@@ -21,6 +21,12 @@ export function methodNotAllowed(res: VercelResponse, allowed: string[]) {
   res.status(405).json({ error: 'Método no permitido' });
 }
 
+/** Detecta el error de Postgres por violar un UNIQUE/PRIMARY KEY (code 23505),
+ *  para responder 409 en vez de dejar que se propague como 500. */
+export function isUniqueViolation(err: unknown): boolean {
+  return !!err && typeof err === 'object' && 'code' in err && (err as { code: string }).code === '23505';
+}
+
 /** Vercel ya parsea el body como JSON cuando Content-Type es application/json; esto solo
  *  centraliza el cast + un mensaje de error claro si llega vacío en un POST/PATCH. */
 export function requireBody<T = Record<string, unknown>>(req: VercelRequest): T {

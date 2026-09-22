@@ -1,6 +1,7 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelResponse } from '@vercel/node';
 import { queryOne, query, withTransaction } from './_lib/db.js';
 import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
+import { requireAuth, type AuthedRequest } from './_lib/auth.js';
 import type { Topping } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
@@ -8,13 +9,19 @@ const SELECT_COLUMNS = `
   low_stock_threshold as "lowStockThreshold"
 `;
 
-async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: AuthedRequest, res: VercelResponse) {
   const id = typeof req.query.id === 'string' ? req.query.id : undefined;
 
   // ── GET /api/toppings ───────────────────────────────────────────────────────
   if (req.method === 'GET' && !id) {
     const toppings = await query<Topping>(`select ${SELECT_COLUMNS} from toppings order by name asc`);
     res.status(200).json(toppings);
+    return;
+  }
+
+  // Crear, editar o eliminar toppings es exclusivo de un administrador.
+  if (req.method !== 'GET' && req.user.role !== 'admin') {
+    res.status(403).json({ error: 'Solo un administrador puede gestionar toppings.' });
     return;
   }
 
@@ -75,19 +82,15 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   if (req.method === 'DELETE' && id) {
-    try {
-      await withTransaction(async (tx) => {
-        await tx(`update products set topping_ids = topping_ids - $1`, [id]);
-        await tx(`delete from toppings where id = $1`, [id]);
-      });
-      res.status(204).end();
-    } catch (err) {
-      res.status(500).json({ error: 'Database error', details: err });
-    }
+    await withTransaction(async (tx) => {
+      await tx(`update products set topping_ids = topping_ids - $1`, [id]);
+      await tx(`delete from toppings where id = $1`, [id]);
+    });
+    res.status(204).end();
     return;
   }
 
   methodNotAllowed(res, ['GET', 'POST', 'PATCH', 'DELETE']);
 }
 
-export default withErrorHandling(handler);
+export default withErrorHandling(requireAuth(handler));

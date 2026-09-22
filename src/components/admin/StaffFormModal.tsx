@@ -31,20 +31,23 @@ function randomPin() {
 export function StaffFormModal({ user, open, onClose }: StaffFormModalProps) {
   const addUser = useStaffStore((s) => s.addUser);
   const updateUser = useStaffStore((s) => s.updateUser);
-  const isPinTaken = useStaffStore((s) => s.isPinTaken);
   const branches = useBranchStore((s) => s.branches);
   const [form, setForm] = useState(emptyForm);
   const [pinError, setPinError] = useState<string | null>(null);
   const [branchError, setBranchError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (user) {
-      setForm({ name: user.name, role: user.role, pin: user.pin, color: user.color, branchIds: user.branchIds });
+      // El servidor nunca devuelve el PIN existente — en edición arranca en blanco
+      // ("dejar en blanco para no cambiarlo").
+      setForm({ name: user.name, role: user.role, pin: '', color: user.color, branchIds: user.branchIds });
     } else {
       setForm({ ...emptyForm, pin: randomPin() });
     }
     setPinError(null);
     setBranchError(null);
+    setSaving(false);
   }, [user, open]);
 
   function toggleBranch(id: string) {
@@ -61,14 +64,15 @@ export function StaffFormModal({ user, open, onClose }: StaffFormModalProps) {
     setPinError(null);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!form.name.trim()) return;
-    if (form.pin.length !== 4) {
+    // Al crear, el PIN es obligatorio; al editar, en blanco significa "no cambiarlo".
+    if (form.pin.length > 0 && form.pin.length !== 4) {
       setPinError('El PIN debe tener exactamente 4 dígitos.');
       return;
     }
-    if (isPinTaken(form.pin, user?.id)) {
-      setPinError('Ese PIN ya está en uso por otro miembro del personal.');
+    if (!user && form.pin.length !== 4) {
+      setPinError('El PIN debe tener exactamente 4 dígitos.');
       return;
     }
     if (form.role === 'cajero' && form.branchIds.length === 0) {
@@ -76,19 +80,31 @@ export function StaffFormModal({ user, open, onClose }: StaffFormModalProps) {
       return;
     }
 
-    const data = {
-      name: form.name.trim(),
-      role: form.role,
-      pin: form.pin,
-      color: form.color,
-      branchIds: form.branchIds,
-    };
-    if (user) {
-      updateUser(user.id, data);
-    } else {
-      addUser(data);
+    setSaving(true);
+    try {
+      if (user) {
+        await updateUser(user.id, {
+          name: form.name.trim(),
+          role: form.role,
+          color: form.color,
+          branchIds: form.branchIds,
+          ...(form.pin ? { pin: form.pin } : {}),
+        });
+      } else {
+        await addUser({
+          name: form.name.trim(),
+          role: form.role,
+          pin: form.pin,
+          color: form.color,
+          branchIds: form.branchIds,
+        });
+      }
+      onClose();
+    } catch (err) {
+      // El caso típico es 409 (PIN duplicado), validado ahora en el servidor.
+      setPinError(err instanceof Error ? err.message : 'No se pudo guardar. Intenta nuevamente.');
+      setSaving(false);
     }
-    onClose();
   }
 
   const isPrimaryAdmin = !!user?.protected;
@@ -140,7 +156,9 @@ export function StaffFormModal({ user, open, onClose }: StaffFormModalProps) {
 
         <div>
           <div className="mb-1 flex items-center justify-between">
-            <span className={fieldLabelClasses}>PIN de acceso (4 dígitos)</span>
+            <span className={fieldLabelClasses}>
+              PIN de acceso (4 dígitos){user && <span className="font-normal text-ink-soft"> — opcional</span>}
+            </span>
             <button
               type="button"
               onClick={() => handlePinChange(randomPin())}
@@ -155,7 +173,7 @@ export function StaffFormModal({ user, open, onClose }: StaffFormModalProps) {
             inputMode="numeric"
             pattern="[0-9]*"
             maxLength={4}
-            placeholder="0000"
+            placeholder={user ? 'Dejar en blanco para no cambiarlo' : '0000'}
             className={cn(fieldClasses, 'min-h-touch text-center font-display text-2xl font-bold tracking-[0.5em]')}
           />
           {pinError && <p className="mt-1.5 text-xs font-semibold text-red-600">{pinError}</p>}
@@ -222,9 +240,9 @@ export function StaffFormModal({ user, open, onClose }: StaffFormModalProps) {
           onClick={handleSave}
           className="flex-[2] !bg-amber-500 py-3 !text-white !shadow-lg hover:!bg-amber-600"
           size="lg"
-          disabled={!form.name.trim()}
+          disabled={!form.name.trim() || saving}
         >
-          {user ? 'Guardar cambios' : 'Crear usuario'}
+          {saving ? 'Guardando…' : user ? 'Guardar cambios' : 'Crear usuario'}
         </Button>
       </div>
     </Modal>

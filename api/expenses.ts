@@ -1,6 +1,7 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelResponse } from '@vercel/node';
 import { query } from './_lib/db.js';
 import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
+import { requireAuth, type AuthedRequest } from './_lib/auth.js';
 import type { Expense } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
@@ -11,7 +12,7 @@ const SELECT_COLUMNS = `
   created_at as "createdAt"
 `;
 
-async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: AuthedRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     const expenses = await query<Expense>(
       `SELECT ${SELECT_COLUMNS} FROM expenses ORDER BY created_at DESC`
@@ -53,4 +54,4 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   methodNotAllowed(res, ['GET', 'POST']);
 }
 
-export default withErrorHandling(handler);
+export default withErrorHandling(requireAuth(handler));

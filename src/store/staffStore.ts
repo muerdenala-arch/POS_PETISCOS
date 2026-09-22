@@ -17,12 +17,11 @@ interface StaffState {
   users: User[];
   hydrated: boolean;
   fetchAll: () => Promise<void>;
-  addUser: (data: StaffFormData) => User;
-  updateUser: (id: string, data: StaffFormData) => void;
+  addUser: (data: StaffFormData) => Promise<User>;
+  updateUser: (id: string, data: Partial<StaffFormData>) => Promise<void>;
   toggleBlocked: (id: string) => void;
   resetPin: (id: string, pin: string) => void;
   removeUser: (id: string) => void;
-  isPinTaken: (pin: string, excludeId?: string) => boolean;
 }
 
 export const useStaffStore = create<StaffState>()((set, get) => ({
@@ -38,15 +37,28 @@ export const useStaffStore = create<StaffState>()((set, get) => ({
     }
   },
 
-  addUser: (data) => {
+  addUser: async (data) => {
     const user: User = { ...data, id: uid('user'), status: 'activo', createdAt: new Date().toISOString() };
     set((state) => ({ users: [...state.users, user] }));
-    api.staff.create(user).catch((err) => console.error('No se pudo crear el usuario:', err));
+    try {
+      await api.staff.create(user);
+    } catch (err) {
+      // El PIN podría estar duplicado (409) u otro error de validación — no dejar
+      // el usuario "fantasma" en la UI si el servidor lo rechazó.
+      set((state) => ({ users: state.users.filter((u) => u.id !== user.id) }));
+      throw err;
+    }
     return user;
   },
-  updateUser: (id, data) => {
+  updateUser: async (id, data) => {
+    const previous = get().users.find((u) => u.id === id);
     set((state) => ({ users: state.users.map((u) => (u.id === id ? { ...u, ...data } : u)) }));
-    api.staff.update(id, data).catch((err) => console.error('No se pudo actualizar el usuario:', err));
+    try {
+      await api.staff.update(id, data);
+    } catch (err) {
+      if (previous) set((state) => ({ users: state.users.map((u) => (u.id === id ? previous : u)) }));
+      throw err;
+    }
   },
   toggleBlocked: (id) => {
     const user = get().users.find((u) => u.id === id);
@@ -56,7 +68,6 @@ export const useStaffStore = create<StaffState>()((set, get) => ({
     api.staff.update(id, { status }).catch((err) => console.error('No se pudo actualizar el estado:', err));
   },
   resetPin: (id, pin) => {
-    set((state) => ({ users: state.users.map((u) => (u.id === id ? { ...u, pin } : u)) }));
     api.staff.update(id, { pin }).catch((err) => console.error('No se pudo restablecer el PIN:', err));
   },
   removeUser: (id) => {
@@ -65,5 +76,4 @@ export const useStaffStore = create<StaffState>()((set, get) => ({
     set((state) => ({ users: state.users.filter((u) => !(u.id === id && !u.protected)) }));
     api.staff.remove(id).catch((err) => console.error('No se pudo eliminar el usuario:', err));
   },
-  isPinTaken: (pin, excludeId) => get().users.some((u) => u.pin === pin && u.id !== excludeId),
 }));

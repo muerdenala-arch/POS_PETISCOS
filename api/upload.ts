@@ -1,10 +1,11 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelResponse } from '@vercel/node';
 import { uploadImage, type ImageFolder } from './_lib/cloudinary.js';
 import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
+import { requireAuth, type AuthedRequest } from './_lib/auth.js';
 
 const ALLOWED_FOLDERS: ImageFolder[] = ['receipts', 'qr-codes', 'products'];
 
-async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: AuthedRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     methodNotAllowed(res, ['POST']);
     return;
@@ -32,4 +33,4 @@ export const config = {
   },
 };
 
-export default withErrorHandling(handler);
+export default withErrorHandling(requireAuth(handler));

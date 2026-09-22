@@ -38,6 +38,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}) as { error?: string });
+      // Sesión ausente o vencida: forzar logout local para volver a /login. Se excluye
+      // el propio intento de login (un PIN incorrecto también responde 401).
+      if (res.status === 401 && !path.startsWith('/staff?action=login')) {
+        import('@/store/authStore').then(({ useAuthStore }) => useAuthStore.getState().logout());
+      }
       throw new Error(body.error || `Error ${res.status} en ${path}`);
     }
     if (res.status === 204) return undefined as T;
@@ -63,6 +68,12 @@ const del = (path: string) => request<void>(path, { method: 'DELETE' });
 const withId = (path: string, id: string) => `${path}?id=${encodeURIComponent(id)}`;
 
 export const api = {
+  auth: {
+    /** Verifica el PIN en el servidor y abre sesión (cookie httpOnly) — nunca se
+     *  descarga la lista de PINs al navegador. */
+    login: (pin: string) => post<User>('/staff?action=login', { pin }),
+    logout: () => post<void>('/staff?action=logout', {}),
+  },
   branches: {
     list: () => get<Branch[]>('/branches'),
     create: (data: Branch) => post<Branch>('/branches', data),

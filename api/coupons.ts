@@ -1,6 +1,7 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelResponse } from '@vercel/node';
 import { query, queryOne } from './_lib/db.js';
-import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
+import { isUniqueViolation, methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
+import { requireAuth, type AuthedRequest } from './_lib/auth.js';
 import type { Coupon } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
@@ -10,7 +11,7 @@ const SELECT_COLUMNS = `
   applies_to as "appliesTo", branch_id as "branchId", created_at as "createdAt"
 `;
 
-async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: AuthedRequest, res: VercelResponse) {
   const id = typeof req.query.id === 'string' ? req.query.id : undefined;
   const validateCode = typeof req.query.validate === 'string' ? req.query.validate : undefined;
   const branchIdQ = typeof req.query.branchId === 'string' ? req.query.branchId : null;
@@ -56,6 +57,12 @@ async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
+  // Crear, editar o eliminar cupones es exclusivo de un administrador.
+  if (req.method !== 'GET' && req.user.role !== 'admin') {
+    res.status(403).json({ error: 'Solo un administrador puede gestionar cupones.' });
+    return;
+  }
+
   if (req.method === 'POST' && !id) {
     const body = requireBody<Coupon>(req);
     try {
@@ -77,7 +84,7 @@ async function handler(req: VercelRequest, res: VercelResponse) {
       );
       res.status(201).json(rows[0]);
     } catch (err: unknown) {
-      if (typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === '23505') {
+      if (isUniqueViolation(err)) {
         res.status(409).json({ error: 'Ya existe un cupón con ese código.' });
         return;
       }
@@ -126,4 +133,4 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   methodNotAllowed(res, ['GET', 'POST', 'PATCH', 'DELETE']);
 }
 
-export default withErrorHandling(handler);
+export default withErrorHandling(requireAuth(handler));

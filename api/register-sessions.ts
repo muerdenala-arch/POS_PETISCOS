@@ -1,6 +1,7 @@
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { VercelResponse } from '@vercel/node';
 import { query, queryOne } from './_lib/db.js';
 import { methodNotAllowed, requireBody, withErrorHandling } from './_lib/http.js';
+import { requireAuth, type AuthedRequest } from './_lib/auth.js';
 import type { CashRegisterSession } from '../src/types/index.js';
 
 const SELECT_COLUMNS = `
@@ -11,7 +12,7 @@ const SELECT_COLUMNS = `
   cash_sales_total as "cashSalesTotal", qr_sales_total as "qrSalesTotal", status, notes
 `;
 
-async function handler(req: VercelRequest, res: VercelResponse) {
+async function handler(req: AuthedRequest, res: VercelResponse) {
   const id = typeof req.query.id === 'string' ? req.query.id : undefined;
 
   if (req.method === 'GET' && !id) {
@@ -45,7 +46,17 @@ async function handler(req: VercelRequest, res: VercelResponse) {
        returning ${SELECT_COLUMNS}`,
       [body.id, body.cashierId, body.cashierName, body.branchId, body.openingAmount ?? 0, body.notes ?? null],
     );
-    res.status(201).json(rows[0]);
+    if (rows[0]) {
+      res.status(201).json(rows[0]);
+      return;
+    }
+    // Idempotencia: id ya existía (reintento de la cola offline) — devolver la sesión
+    // existente en vez de un 201 con cuerpo vacío, igual que /api/sales y /api/expenses.
+    const existing = await queryOne<CashRegisterSession>(
+      `select ${SELECT_COLUMNS} from register_sessions where id = $1`,
+      [body.id],
+    );
+    res.status(existing ? 409 : 500).json(existing ?? { error: 'No se pudo abrir la caja.' });
     return;
   }
 
@@ -99,4 +110,4 @@ async function handler(req: VercelRequest, res: VercelResponse) {
   methodNotAllowed(res, ['GET', 'POST', 'PATCH']);
 }
 
-export default withErrorHandling(handler);
+export default withErrorHandling(requireAuth(handler));
